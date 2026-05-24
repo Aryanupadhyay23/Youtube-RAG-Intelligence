@@ -6,7 +6,7 @@ An AI-powered YouTube video assistant built with LangChain, Groq LLaMA 3.3, Hugg
 
 ## Live Demo
 
-[YouTube RAG Intelligence on HuggingFace](https://huggingface.co/spaces/YOUR_USERNAME/YOUR_SPACE_NAME)
+[YouTube RAG Intelligence on HuggingFace](https://huggingface.co/spaces/Aryan2301/YouTube_RAG_Intelligence)
 
 ---
 

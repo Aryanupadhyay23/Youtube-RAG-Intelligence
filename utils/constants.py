@@ -23,16 +23,13 @@ RRF_K = 60
 MAX_RETRIEVAL_ATTEMPTS = 2
 RECENT_MESSAGE_COUNT = 6
 
-LLM_MODEL = "llama-3.3-70b-versatile"
+LLM_MODEL = "openai/gpt-oss-120b"
 
 LLM_TEMPERATURE = 0.3
 
-LLM_MAX_TOKENS = 2048
 
-EMBEDDING_MODEL = (
-    "sentence-transformers/"
-    "all-MiniLM-L6-v2"
-)
+
+EMBEDDING_MODEL = "models/gemini-embedding-2"
 
 QUICK_QUESTIONS = [
     "What is the main topic?",

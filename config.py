@@ -19,7 +19,6 @@ from utils.constants import (
     RECENT_MESSAGE_COUNT,
     LLM_MODEL,
     LLM_TEMPERATURE,
-    LLM_MAX_TOKENS,
     EMBEDDING_MODEL,
     QUICK_QUESTIONS,
 )

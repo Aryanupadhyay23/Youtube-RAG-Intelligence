@@ -1,4 +1,5 @@
 import os
+import asyncio
 from config import TAVILY_API_KEY
 
 try:
@@ -11,18 +12,16 @@ try:
 except ImportError:
     search_tool = None
 
-def fallback_web_search(query: str) -> str:
+async def fallback_web_search(query: str) -> str:
     """
-    Perform a fallback web search using Tavily when internal RAG context is insufficient.
-    Returns a string of results or a message if unavailable.
+    Perform an async fallback web search using Tavily.
     """
     if search_tool is None or not TAVILY_API_KEY:
         return "Web search is currently unavailable (TAVILY_API_KEY not configured or library missing)."
         
     try:
-        results = search_tool.invoke({"query": query})
+        results = await asyncio.to_thread(search_tool.invoke, {"query": query})
         
-        # Tavily returns a list of dicts. We format it into readable text.
         formatted_results = []
         if isinstance(results, list):
             for res in results:

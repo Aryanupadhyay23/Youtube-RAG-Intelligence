@@ -2,18 +2,13 @@ from langchain_text_splitters import (
     RecursiveCharacterTextSplitter,
 )
 
-from langchain_core.prompts import (
-    PromptTemplate,
-)
-
 from langchain_core.output_parsers import (
     StrOutputParser,
 )
 
 from core.prompts import (
-    SUMMARY_PROMPT,
-    MAP_SUMMARY_PROMPT,
-    REDUCE_SUMMARY_PROMPT,
+    CHUNK_SUMMARY_PROMPT,
+    FINAL_SUMMARY_PROMPT,
 )
 
 from utils.constants import (
@@ -36,28 +31,18 @@ def generate_summary(
 
     if len(chunks) == 1:
 
-        prompt = PromptTemplate(
-            input_variables=["transcript"],
-            template=SUMMARY_PROMPT,
-        )
-
         chain = (
-            prompt
+            FINAL_SUMMARY_PROMPT
             | llm
             | StrOutputParser()
         )
 
         return chain.invoke({
-            "transcript": chunks[0]
+            "section_summaries": chunks[0]
         })
 
-    map_prompt = PromptTemplate(
-        input_variables=["chunk"],
-        template=MAP_SUMMARY_PROMPT,
-    )
-
     map_chain = (
-        map_prompt
+        CHUNK_SUMMARY_PROMPT
         | llm
         | StrOutputParser()
     )
@@ -67,24 +52,20 @@ def generate_summary(
     for chunk in chunks:
 
         summary = map_chain.invoke({
-            "chunk": chunk
+            "chunk": chunk,
+            "timestamp": "N/A"
         })
 
         partial_summaries.append(summary)
 
-    reduce_prompt = PromptTemplate(
-        input_variables=["summaries"],
-        template=REDUCE_SUMMARY_PROMPT,
-    )
-
     reduce_chain = (
-        reduce_prompt
+        FINAL_SUMMARY_PROMPT
         | llm
         | StrOutputParser()
     )
 
     final_summary = reduce_chain.invoke({
-        "summaries": "\n\n".join(partial_summaries)
+        "section_summaries": "\n\n".join(partial_summaries)
     })
 
     return final_summary

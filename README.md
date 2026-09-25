@@ -1,6 +1,6 @@
 # YouTube RAG Intelligence
 
-An AI-powered YouTube video assistant built with LangGraph, LangChain, Groq LLaMA 3.3, HuggingFace embeddings, BM25, and ChromaDB. Chat with any video, generate summaries, and explore transcripts.
+An AI-powered YouTube video assistant built with LangGraph, LangChain, Groq LLaMA 3.3, Google Gemini embeddings, LangChain native EnsembleRetriever, and ChromaDB. Chat with any video, generate summaries, and explore transcripts.
 
 > Transcripts in any language are automatically answered in English.
 
@@ -27,7 +27,7 @@ An AI-powered YouTube video assistant built with LangGraph, LangChain, Groq LLaM
 |---|---|
 | LLM | Groq LLaMA 3.3 70B |
 | Orchestration | LangGraph & LangChain |
-| Embeddings | HuggingFace all-MiniLM-L6-v2 |
+| Embeddings | Google Gemini-embedding-2 |
 | Vector Store | Hybrid ChromaDB + BM25 |
 | Transcripts | Supadata API |
 | UI | Streamlit |
@@ -46,14 +46,12 @@ assets/
     styles.css
 core/
     __init__.py
-    bm25.py
     chunking.py
     embeddings.py
     graph.py
     llm.py
-    prompts.py
+    prompts/
     retrieval.py
-    rrf.py
     summary.py
     vectorstore.py
 exports/
@@ -121,7 +119,7 @@ SUPADATA_KEY_1=your_supadata_key_here
 SUPADATA_KEY_2=your_second_supadata_key_here
 SUPADATA_KEY_3=your_third_supadata_key_here
 SUPADATA_KEY_4=your_fourth_supadata_key_here
-HF_TOKEN=your_huggingface_token_here
+GOOGLE_API_KEY=your_google_api_key_here
 TAVILY_API_KEY=your_tavily_api_key_here
 ```
 
@@ -134,6 +132,13 @@ streamlit run app.py
 ```
 
 Open http://localhost:8501 in your browser.
+
+### 6. Run API Server (Optional)
+
+We also provide an asynchronous FastAPI endpoint with Server-Sent Events (SSE) for streaming graph execution:
+```bash
+uvicorn api:app --reload --port 8000
+```
 
 ---
 
@@ -163,7 +168,7 @@ Add each of the following:
 | `SUPADATA_KEY_2` | Optional | Fallback if key 1 hits rate limit |
 | `SUPADATA_KEY_3` | Optional | Fallback if key 2 hits rate limit |
 | `SUPADATA_KEY_4` | Optional | Fallback if key 3 hits rate limit |
-| `HF_TOKEN` | Optional | https://huggingface.co/settings/tokens |
+| `GOOGLE_API_KEY` | Required | https://aistudio.google.com |
 | `TAVILY_API_KEY` | Optional | https://tavily.com |
 
 Secrets are injected into `os.environ` automatically before the app starts.
@@ -220,7 +225,7 @@ Once the Space builds and starts:
 | `SUPADATA_KEY_2` | Yes | Yes | Optional |
 | `SUPADATA_KEY_3` | Yes | Yes | Optional |
 | `SUPADATA_KEY_4` | Yes | Yes | Optional |
-| `HF_TOKEN` | Yes | Yes | Optional |
+| `GOOGLE_API_KEY` | Yes | Yes | Required |
 | `TAVILY_API_KEY` | Yes | Yes | Optional |
 
 ---

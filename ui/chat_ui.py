@@ -1,53 +1,64 @@
+import json
+import requests
 import streamlit as st
 
 from services.chat_service import save_current_chat
 from utils.constants import MEMORY_WINDOW, QUICK_QUESTIONS
 
 def _stream_response(question, chat_history):
-    """Invoke LangGraph and stream the final LLM response."""
-    graph = st.session_state.rag_graph
-    llm = st.session_state.llm
-    checkpointer = st.session_state.checkpointer
+    """Invoke FastAPI backend and stream the Server-Sent Events."""
     
-    # Create thread config for LangGraph memory
-    thread_id = f"{st.session_state.video_id}_{st.session_state.current_chat_id}"
-    config = {"configurable": {"thread_id": thread_id}}
-    
-    # Initialize state
-    inputs = {
-        "query": question,
-        "chat_history": chat_history,
+    payload = {
         "video_id": st.session_state.video_id,
-        "vector_store": st.session_state.vector_store,
-        "bm25_retriever": st.session_state.bm25_retriever,
-        "llm": llm,
-        "retrieval_attempt": 0,
-        "context": "" # Clear context for new run
+        "chat_id": st.session_state.current_chat_id,
+        "query": question,
+        "chat_history": chat_history
     }
     
-    # Run graph with checkpointing
-    # Graph execution to prepare the answer messages
-    state = graph.invoke(inputs, config=config)
-    
-    # state["answer"] contains the messages array from generate_answer node
-    messages = state.get("answer", [])
+    status_placeholder = st.empty()
+    response_placeholder = st.empty()
     
     full_response = ""
     
-    def _token_generator():
-        nonlocal full_response
-        for chunk in llm.stream(messages):
-            if chunk.content:
-                full_response += chunk.content
-                yield chunk.content
-                
-    st.write_stream(_token_generator())
+    try:
+        # Connect to FastAPI SSE endpoint
+        with requests.post("http://localhost:8000/chat/stream", json=payload, stream=True) as r:
+            r.raise_for_status()
+            for line in r.iter_lines():
+                if line:
+                    decoded_line = line.decode('utf-8')
+                    if decoded_line.startswith("event: "):
+                        event_type = decoded_line[7:]
+                    elif decoded_line.startswith("data: "):
+                        data_str = decoded_line[6:]
+                        if not data_str or data_str == "{}":
+                            continue
+                            
+                        try:
+                            data = json.loads(data_str)
+                            if event_type == "status":
+                                status_placeholder.caption(f"⚙️ {data.get('message', '')}...")
+                            elif event_type == "token":
+                                full_response += data.get("token", "")
+                                response_placeholder.markdown(full_response + "▌")
+                            elif event_type == "error":
+                                status_placeholder.error(data.get("error", "Unknown error"))
+                        except json.JSONDecodeError:
+                            pass
+    except requests.exceptions.ConnectionError:
+        status_placeholder.error("❌ Could not connect to API server. Is Uvicorn running on port 8000?")
+    except Exception as e:
+        status_placeholder.error(f"❌ Error during API streaming: {str(e)}")
+        
+    # Final cleanup
+    status_placeholder.empty()
+    response_placeholder.markdown(full_response)
     
     return full_response
 
 def render_chat_ui():
     st.subheader("💬 Chat with this Video")
-    st.caption("Responses are grounded strictly in transcript context using Corrective RAG.")
+    st.caption("Responses are grounded strictly in transcript context using Async Corrective RAG (via FastAPI).")
 
     # ── quick-question buttons ────────────────────────────
     cols = st.columns(3)

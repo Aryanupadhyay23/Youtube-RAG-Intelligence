@@ -5,10 +5,10 @@ from langchain_core.messages import HumanMessage, AIMessage
 
 from core.retrieval import hybrid_retrieve
 from core.prompts import (
-    SYSTEM_PROMPT, 
-    REWRITE_PROMPT, 
-    GRADER_PROMPT,
-    WEB_SEARCH_ROUTER_PROMPT
+    REWRITE_PROMPT, RewriteResult,
+    GRADER_PROMPT, GradeResult,
+    CORRECTIVE_PROMPT, CorrectResult,
+    ANSWER_PROMPT
 )
 from services.web_search_service import fallback_web_search
 from utils.constants import MAX_RETRIEVAL_ATTEMPTS
@@ -41,35 +41,45 @@ def format_docs_with_timestamps(docs):
         formatted.append(f"Content: {doc.page_content}\nSource: {url}")
     return "\n\n".join(formatted)
 
-def rewrite_query(state: RAGState) -> RAGState:
-    query = state["query"]
+async def _rephrase_query(state: RAGState, prompt, output_schema, **kwargs) -> RAGState:
+    query = state.get("rewritten_query", state["query"])
     history = state.get("chat_history", [])
-    llm = state["llm"]
     
-    if not history:
-        return {"rewritten_query": query}
+    native_history = []
+    for h in history:
+        native_history.append(HumanMessage(content=h['user']))
+        native_history.append(AIMessage(content=h['ai']))
+    
+    structured_llm = state["llm"].with_structured_output(output_schema)
+    messages = prompt.format_messages(chat_history=native_history, **kwargs)
+    
+    response = await structured_llm.ainvoke(messages)
+    
+    # Extract the rephrased query regardless of the specific schema attribute
+    new_query = getattr(response, "standalone_query", getattr(response, "corrected_query", query))
+    if hasattr(response, "needs_rewrite") and not response.needs_rewrite:
+        new_query = query
         
-    formatted_history = "\n".join([f"User: {h['user']}\nAI: {h['ai']}" for h in history])
-    
-    prompt = REWRITE_PROMPT.format(chat_history=formatted_history, question=query)
-    response = llm.invoke([HumanMessage(content=prompt)])
-    
-    rewritten = response.content.strip()
-    logger.info(f"Query rewritten: '{query}' -> '{rewritten}'")
-    return {"rewritten_query": rewritten}
+    logger.info(f"Query updated: '{query}' -> '{new_query}'")
+    return {"rewritten_query": new_query}
 
-def hybrid_retrieve_node(state: RAGState) -> RAGState:
+async def rewrite_query(state: RAGState) -> RAGState:
+    if not state.get("chat_history"):
+        return {"rewritten_query": state["query"]}
+    return await _rephrase_query(state, REWRITE_PROMPT, RewriteResult, question=state["query"])
+
+async def hybrid_retrieve_node(state: RAGState) -> RAGState:
     query = state.get("rewritten_query", state["query"])
     vector_store = state["vector_store"]
     bm25 = state["bm25_retriever"]
     attempt = state.get("retrieval_attempt", 0) + 1
     
-    docs = hybrid_retrieve(query, vector_store, bm25)
+    docs = await hybrid_retrieve(query, vector_store, bm25)
     
     logger.info(f"Retrieval attempt {attempt}: found {len(docs)} documents.")
     return {"retrieved_documents": docs, "retrieval_attempt": attempt}
 
-def evaluate_retrieval(state: RAGState) -> RAGState:
+async def evaluate_retrieval(state: RAGState) -> RAGState:
     docs = state["retrieved_documents"]
     query = state.get("rewritten_query", state["query"])
     llm = state["llm"]
@@ -77,37 +87,29 @@ def evaluate_retrieval(state: RAGState) -> RAGState:
     if not docs:
         return {"retrieval_score": "POOR"}
         
-    # Grade top document
     top_doc = docs[0].page_content
-    prompt = GRADER_PROMPT.format(question=query, document=top_doc)
+    structured_llm = llm.with_structured_output(GradeResult)
+    messages = GRADER_PROMPT.format_messages(question=query, document=top_doc)
     
-    response = llm.invoke([HumanMessage(content=prompt)])
-    score = response.content.strip().lower()
+    response = await structured_llm.ainvoke(messages)
     
-    grade = "GOOD" if "yes" in score else "POOR"
-    logger.info(f"Retrieval graded as: {grade}")
+    grade = "GOOD" if response.relevant else "POOR"
+    logger.info(f"Retrieval graded as: {grade} (Score: {response.score}, Reason: {response.reason})")
     return {"retrieval_score": grade}
 
-def correct_query(state: RAGState) -> RAGState:
-    query = state.get("rewritten_query", state["query"])
-    llm = state["llm"]
-    
-    # Simple correction prompt
-    prompt = f"The query '{query}' did not return relevant results. Rewrite it to be broader or use different keywords to improve search."
-    response = llm.invoke([HumanMessage(content=prompt)])
-    
-    corrected = response.content.strip()
-    logger.info(f"Query corrected: '{query}' -> '{corrected}'")
-    return {"rewritten_query": corrected}
+async def correct_query(state: RAGState) -> RAGState:
+    return await _rephrase_query(
+        state, CORRECTIVE_PROMPT, CorrectResult, 
+        original_query=state["query"], failed_query=state.get("rewritten_query", state["query"])
+    )
 
-def web_search(state: RAGState) -> RAGState:
+async def web_search(state: RAGState) -> RAGState:
     query = state.get("rewritten_query", state["query"])
-    results = fallback_web_search(query)
+    results = await fallback_web_search(query)
     logger.info("Web search used as fallback.")
     return {"context": f"[WEB SEARCH RESULTS]\n{results}"}
 
-def generate_answer(state: RAGState) -> RAGState:
-    # If context is not already populated (e.g. by web search), format docs
+async def generate_answer(state: RAGState) -> RAGState:
     if not state.get("context") and state.get("retrieved_documents"):
         state["context"] = format_docs_with_timestamps(state["retrieved_documents"])
         
@@ -115,22 +117,18 @@ def generate_answer(state: RAGState) -> RAGState:
     query = state.get("rewritten_query", state["query"])
     history = state.get("chat_history", [])
     
-    messages = [
-        {"role": "system", "content": SYSTEM_PROMPT.format(context=context)}
-    ]
-    
+    native_history = []
     for h in history:
-        messages.append({"role": "user", "content": h["user"]})
-        messages.append({"role": "assistant", "content": h["ai"]})
+        native_history.append(HumanMessage(content=h['user']))
+        native_history.append(AIMessage(content=h['ai']))
         
-    messages.append({"role": "user", "content": query})
+    messages = ANSWER_PROMPT.format_messages(
+        context=context,
+        chat_history=native_history,
+        query=query
+    )
     
-    # We will pass messages to LLM in the main app to support streaming,
-    # or we can do it here. To preserve streaming natively in Streamlit, 
-    # we might want to return the prompt configuration and stream outside, 
-    # but LangGraph supports streaming events. Let's just generate it here 
-    # and the app will stream using langgraph event streaming.
-    return {"answer": messages} # Returning messages payload for streaming
+    return {"answer": messages}
 
 def route_after_evaluation(state: RAGState):
     score = state["retrieval_score"]

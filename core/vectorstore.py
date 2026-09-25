@@ -1,7 +1,7 @@
 from langchain_community.vectorstores import Chroma
 from core.embeddings import load_embeddings
 from core.chunking import create_timestamp_aware_chunks
-from core.bm25 import BM25Retriever
+from langchain_community.retrievers import BM25Retriever
 
 def build_retrievers(video_id: str, transcript_segments: list):
     """
@@ -19,7 +19,7 @@ def build_retrievers(video_id: str, transcript_segments: list):
     
     # 3. Build Sparse Retriever (BM25)
     try:
-        bm25_retriever = BM25Retriever(documents)
+        bm25_retriever = BM25Retriever.from_documents(documents)
     except ImportError:
         bm25_retriever = None
         

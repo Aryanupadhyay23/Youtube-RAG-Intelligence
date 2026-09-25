@@ -1,11 +1,9 @@
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from config import EMBEDDING_MODEL
 
 
 def load_embeddings():
 
-    return HuggingFaceEmbeddings(
-        model_name="sentence-transformers/all-MiniLM-L6-v2",
-        encode_kwargs={
-            "normalize_embeddings": True,
-        },
+    return GoogleGenerativeAIEmbeddings(
+        model=EMBEDDING_MODEL,
     )

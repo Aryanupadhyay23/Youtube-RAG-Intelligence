@@ -1,6 +1,6 @@
 # YouTube RAG Intelligence
 
-An AI-powered YouTube video assistant built with LangChain, Groq LLaMA 3.3, HuggingFace embeddings, and FAISS. Chat with any video, generate summaries, and explore transcripts.
+An AI-powered YouTube video assistant built with LangGraph, LangChain, Groq LLaMA 3.3, HuggingFace embeddings, BM25, and ChromaDB. Chat with any video, generate summaries, and explore transcripts.
 
 > Transcripts in any language are automatically answered in English.
 
@@ -12,7 +12,7 @@ An AI-powered YouTube video assistant built with LangChain, Groq LLaMA 3.3, Hugg
 
 ## Features
 
-- **RAG Chat** - Ask questions grounded strictly in transcript context with token-by-token streaming
+- **Corrective RAG Chat** - Ask questions grounded strictly in transcript context with hybrid search (BM25 + Semantic), RRF fusion, and web fallback.
 - **Smart Summary** - Map-reduce summarisation for any video length
 - **Transcript Explorer** - Search keywords and jump to YouTube timestamps
 - **Multi-language** - Transcripts in any language; responses always in English
@@ -26,9 +26,9 @@ An AI-powered YouTube video assistant built with LangChain, Groq LLaMA 3.3, Hugg
 | Layer | Technology |
 |---|---|
 | LLM | Groq LLaMA 3.3 70B |
-| Orchestration | LangChain |
+| Orchestration | LangGraph & LangChain |
 | Embeddings | HuggingFace all-MiniLM-L6-v2 |
-| Vector Store | FAISS (CPU) |
+| Vector Store | Hybrid ChromaDB + BM25 |
 | Transcripts | Supadata API |
 | UI | Streamlit |
 | Runtime | Python 3.11 |
@@ -46,10 +46,14 @@ assets/
     styles.css
 core/
     __init__.py
+    bm25.py
+    chunking.py
     embeddings.py
+    graph.py
     llm.py
     prompts.py
-    rag.py
+    retrieval.py
+    rrf.py
     summary.py
     vectorstore.py
 exports/
@@ -60,6 +64,7 @@ services/
     __init__.py
     chat_service.py
     transcript_service.py
+    web_search_service.py
     youtube_service.py
 ui/
     __init__.py
@@ -74,6 +79,7 @@ utils/
     formatting.py
     helpers.py
     session.py
+    timestamp.py
 ```
 
 ---
@@ -114,7 +120,9 @@ GROQ_API_KEY=your_groq_api_key_here
 SUPADATA_KEY_1=your_supadata_key_here
 SUPADATA_KEY_2=your_second_supadata_key_here
 SUPADATA_KEY_3=your_third_supadata_key_here
+SUPADATA_KEY_4=your_fourth_supadata_key_here
 HF_TOKEN=your_huggingface_token_here
+TAVILY_API_KEY=your_tavily_api_key_here
 ```
 
 > Never commit `.env` to git. It is already listed in `.gitignore`.
@@ -154,7 +162,9 @@ Add each of the following:
 | `SUPADATA_KEY_1` | Required | https://supadata.ai |
 | `SUPADATA_KEY_2` | Optional | Fallback if key 1 hits rate limit |
 | `SUPADATA_KEY_3` | Optional | Fallback if key 2 hits rate limit |
+| `SUPADATA_KEY_4` | Optional | Fallback if key 3 hits rate limit |
 | `HF_TOKEN` | Optional | https://huggingface.co/settings/tokens |
+| `TAVILY_API_KEY` | Optional | https://tavily.com |
 
 Secrets are injected into `os.environ` automatically before the app starts.
 The app detects HuggingFace via the `SPACE_ID` env variable and skips `.env` loading entirely.
@@ -209,7 +219,9 @@ Once the Space builds and starts:
 | `SUPADATA_KEY_1` | Yes | Yes | Required |
 | `SUPADATA_KEY_2` | Yes | Yes | Optional |
 | `SUPADATA_KEY_3` | Yes | Yes | Optional |
+| `SUPADATA_KEY_4` | Yes | Yes | Optional |
 | `HF_TOKEN` | Yes | Yes | Optional |
+| `TAVILY_API_KEY` | Yes | Yes | Optional |
 
 ---
 

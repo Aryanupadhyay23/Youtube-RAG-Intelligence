@@ -10,17 +10,7 @@ from supadata import (
 load_dotenv()
 
 
-SUPADATA_KEYS = [
-    os.environ.get("SUPADATA_KEY_1"),
-    os.environ.get("SUPADATA_KEY_2"),
-    os.environ.get("SUPADATA_KEY_3"),
-]
-
-SUPADATA_KEYS = [
-    key
-    for key in SUPADATA_KEYS
-    if key
-]
+from config import SUPADATA_KEYS
 
 
 def fetch_transcript(video_id: str):

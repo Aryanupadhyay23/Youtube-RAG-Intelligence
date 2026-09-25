@@ -43,8 +43,7 @@ def _render_env_status():
         st.markdown(
             f"{'✅' if supa_ok else '❌'} "
             f"`SUPADATA_KEY` "
-            f"({len(SUPADATA_KEYS)} key{'s' if len(SUPADATA_KEYS) != 1 else ''} "
-            f"{'loaded' if supa_ok else 'missing'})"
+            f"({len(SUPADATA_KEYS)} key{'s' if len(SUPADATA_KEYS) != 1 else ''} loaded)"
         )
 
 

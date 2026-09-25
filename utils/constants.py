@@ -1,8 +1,7 @@
 APP_TITLE = "YouTube RAG Intelligence"
 
 APP_CAPTION = (
-    "Supadata • Groq LLaMA 3.3 • "
-    "HuggingFace • FAISS"
+    "AI-Powered Chat, Summaries, and Transcript Explorer"
 )
 
 MEMORY_WINDOW = 10
@@ -16,6 +15,13 @@ SUMMARY_CHUNK_SIZE = 8000
 SUMMARY_CHUNK_OVERLAP = 400
 
 RETRIEVER_K = 4
+
+SEMANTIC_TOP_K = 20
+BM25_TOP_K = 20
+FINAL_TOP_K = 5
+RRF_K = 60
+MAX_RETRIEVAL_ATTEMPTS = 2
+RECENT_MESSAGE_COUNT = 6
 
 LLM_MODEL = "llama-3.3-70b-versatile"
 

@@ -11,6 +11,12 @@ from utils.constants import (
     SUMMARY_CHUNK_SIZE,
     SUMMARY_CHUNK_OVERLAP,
     RETRIEVER_K,
+    SEMANTIC_TOP_K,
+    BM25_TOP_K,
+    FINAL_TOP_K,
+    RRF_K,
+    MAX_RETRIEVAL_ATTEMPTS,
+    RECENT_MESSAGE_COUNT,
     LLM_MODEL,
     LLM_TEMPERATURE,
     LLM_MAX_TOKENS,
@@ -37,9 +43,10 @@ GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 HF_TOKEN = os.environ.get("HF_TOKEN", "")
 
 SUPADATA_KEYS = [
-    os.environ.get("SUPADATA_KEY_1"),
-    os.environ.get("SUPADATA_KEY_2"),
-    os.environ.get("SUPADATA_KEY_3"),
+    os.environ.get("SUPADATA_KEY_1") or os.environ.get("SUPADATA_KEY_ONE"),
+    os.environ.get("SUPADATA_KEY_2") or os.environ.get("SUPADATA_KEY_TWO"),
+    os.environ.get("SUPADATA_KEY_3") or os.environ.get("SUPADATA_KEY_THREE"),
+    os.environ.get("SUPADATA_KEY_4") or os.environ.get("SUPADATA_KEY_FOUR"),
 ]
 
 SUPADATA_KEYS = [
@@ -47,6 +54,8 @@ SUPADATA_KEYS = [
     for key in SUPADATA_KEYS
     if key
 ]
+
+TAVILY_API_KEY = os.environ.get("TAVILY_API_KEY")
 
 if HF_TOKEN:
     os.environ["HF_TOKEN"] = HF_TOKEN

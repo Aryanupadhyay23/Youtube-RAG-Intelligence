@@ -27,11 +27,12 @@ from services.chat_service import (
     initialize_chat_state,
 )
 
+import sqlite3
+from langgraph.checkpoint.sqlite import SqliteSaver
+
 from core.llm import load_llm
-
-from core.vectorstore import build_vector_store
-
-from core.rag import build_rag_chain
+from core.vectorstore import build_retrievers
+from core.graph import build_langgraph
 
 from ui.sidebar import render_sidebar
 
@@ -114,18 +115,26 @@ if load_button:
                     st.write("🤖 Loading language model…")
                     llm = load_llm()
 
-                    st.write("🗄️ Building vector database…")
-                    vector_store = build_vector_store(transcript_text)
+                    st.write("🗄️ Building vector database and retrievers…")
+                    vector_store, bm25_retriever = build_retrievers(video_id, transcript_segments)
 
-                    st.write("🔗 Creating RAG chain…")
-                    rag_chain = build_rag_chain(vector_store, llm)
+                    st.write("🔗 Creating LangGraph RAG workflow…")
+                    
+                    # Store sqlite connection and checkpointer in session state
+                    if "sqlite_conn" not in st.session_state:
+                        st.session_state.sqlite_conn = sqlite3.connect("checkpoints.sqlite", check_same_thread=False)
+                    checkpointer = SqliteSaver(st.session_state.sqlite_conn)
+                    
+                    rag_graph = build_langgraph(checkpointer=checkpointer)
 
                     st.session_state.video_id = video_id
                     st.session_state.metadata = metadata
                     st.session_state.transcript_text = transcript_text
                     st.session_state.transcript_segments = transcript_segments
                     st.session_state.vector_store = vector_store
-                    st.session_state.rag_chain = rag_chain
+                    st.session_state.bm25_retriever = bm25_retriever
+                    st.session_state.rag_graph = rag_graph
+                    st.session_state.checkpointer = checkpointer
                     st.session_state.llm = llm
 
                     status.update(

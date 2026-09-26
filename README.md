@@ -87,8 +87,8 @@ utils/
 ### 1. Clone
 
 ```bash
-git clone https://github.com/your-username/youtube-rag-intelligence.git
-cd youtube-rag-intelligence
+git clone https://github.com/Aryanupadhyay23/Youtube-RAG-Intelligence.git
+cd Youtube-RAG-Intelligence
 ```
 
 ### 2. Create Virtual Environment
@@ -188,6 +188,10 @@ __pycache__/
 *.pyc
 *.pyo
 .DS_Store
+*.sqlite
+*.sqlite3
+*.sqlite-shm
+*.sqlite-wal
 ```
 
 Required files to upload:

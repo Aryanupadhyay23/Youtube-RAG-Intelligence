@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 # Create non-root user
 RUN useradd -m -u 1000 appuser
@@ -8,7 +8,8 @@ WORKDIR /app
 # Install dependencies first for better layer caching
 COPY requirements.txt .
 
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt
 
 # Copy application files
 COPY --chown=appuser:appuser . .

@@ -4,8 +4,7 @@ from pydantic import BaseModel
 from typing import List, Dict, Any
 import json
 import asyncio
-import aiosqlite
-from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+from langgraph.checkpoint.memory import MemorySaver
 from contextlib import asynccontextmanager
 
 from core.graph import build_langgraph
@@ -14,20 +13,14 @@ from services.transcript_service import fetch_transcript
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Initialize async SQLite connection and checkpointer on startup
-    app.state.sqlite_conn = await aiosqlite.connect("api_checkpoints.sqlite", check_same_thread=False)
-    app.state.checkpointer = AsyncSqliteSaver(app.state.sqlite_conn)
+    # In-memory checkpointer for conversation memory
+    app.state.checkpointer = MemorySaver()
     app.state.rag_graph = build_langgraph(checkpointer=app.state.checkpointer)
     yield
-    # Cleanup on shutdown
-    await app.state.sqlite_conn.close()
 
 app = FastAPI(title="YouTube RAG Intelligence API", lifespan=lifespan)
 
 # Simple in-memory cache for vector stores and retrievers
-# In production, use Redis or a persistent ChromaDB path
-app.state.video_stores = {}
-
 # In production, use Redis or a persistent ChromaDB path
 app.state.video_stores = {}
 

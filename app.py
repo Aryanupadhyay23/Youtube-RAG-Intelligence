@@ -27,9 +27,6 @@ from services.chat_service import (
     initialize_chat_state,
 )
 
-import sqlite3
-from langgraph.checkpoint.sqlite import SqliteSaver
-
 from ui.sidebar import render_sidebar
 
 from ui.chat_ui import render_chat_ui

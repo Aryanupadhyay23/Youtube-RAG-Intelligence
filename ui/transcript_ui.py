@@ -13,6 +13,10 @@ def render_transcript_ui():
     transcript_segments = st.session_state.transcript_segments
     video_id = st.session_state.video_id
 
+    if not transcript_segments or not transcript_text:
+        st.warning("⚠️ No transcript data available for this video.")
+        return
+
     col_mode, col_search = st.columns([1, 2])
 
     view_mode = col_mode.radio(

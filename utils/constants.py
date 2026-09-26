@@ -4,7 +4,7 @@ APP_CAPTION = (
     "AI-Powered Chat, Summaries, and Transcript Explorer"
 )
 
-MEMORY_WINDOW = 10
+MEMORY_WINDOW = 5
 
 CHUNK_SIZE = 1000
 
@@ -24,6 +24,7 @@ MAX_RETRIEVAL_ATTEMPTS = 2
 RECENT_MESSAGE_COUNT = 6
 
 LLM_MODEL = "openai/gpt-oss-120b"
+SUMMARY_MODEL = "gpt-oss:120b-cloud"
 
 LLM_TEMPERATURE = 0.3
 

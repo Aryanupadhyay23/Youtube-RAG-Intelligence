@@ -1,26 +1,60 @@
 import os
 
 from dotenv import load_dotenv
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_groq import ChatGroq
+from langchain_ollama import ChatOllama
 
 from utils.constants import (
+    LLM_MODEL,
+    SUMMARY_MODEL,
     LLM_TEMPERATURE,
 )
 
 load_dotenv()
 
 
-def get_gemini_api_key():
-    return os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+def get_groq_api_key():
+    return os.environ.get("GROQ_API_KEY")
 
 
 def load_llm():
-    gemini_api_key = get_gemini_api_key()
-
-    gemini_llm = ChatGoogleGenerativeAI(
-        model="gemini-3.5-flash-lite",
-        api_key=gemini_api_key,
+    """Load the primary LLM (Groq) for normal chat and RAG flow."""
+    groq_api_key = get_groq_api_key()
+    return ChatGroq(
+        model=LLM_MODEL,
+        groq_api_key=groq_api_key,
         temperature=LLM_TEMPERATURE,
     )
 
-    return gemini_llm
+
+def load_summary_llm():
+    """Load the summarization LLM (gpt-oss:120b-cloud via Ollama)."""
+    ollama_key = (
+        os.environ.get("OLLAMA")
+        or os.environ.get("OLLAMA_API_KEY")
+    )
+    ollama_host = (
+        os.environ.get("OLLAMA_HOST")
+        or os.environ.get("OLLAMA_BASE_URL")
+        or "https://ollama.com"
+    )
+
+    if ollama_key:
+        os.environ["OLLAMA_API_KEY"] = ollama_key
+    if ollama_host:
+        os.environ["OLLAMA_HOST"] = ollama_host
+
+    client_kwargs = {}
+    if ollama_key:
+        client_kwargs["headers"] = {"Authorization": f"Bearer {ollama_key}"}
+
+    kwargs = {
+        "model": SUMMARY_MODEL,
+        "base_url": ollama_host,
+        "temperature": LLM_TEMPERATURE,
+    }
+    if client_kwargs:
+        kwargs["client_kwargs"] = client_kwargs
+        kwargs["async_client_kwargs"] = client_kwargs
+
+    return ChatOllama(**kwargs)

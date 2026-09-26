@@ -134,13 +134,7 @@ async def generate_answer(state: RAGState, config: RunnableConfig) -> RAGState:
     
     answer_text = response.content
     if isinstance(answer_text, list):
-        text_parts = []
-        for part in answer_text:
-            if isinstance(part, dict) and "text" in part:
-                text_parts.append(part["text"])
-            elif isinstance(part, str):
-                text_parts.append(part)
-        answer_text = "".join(text_parts)
+        answer_text = "".join(p.get("text", "") if isinstance(p, dict) else str(p) for p in answer_text)
         
     return {"answer": answer_text}
 

@@ -8,6 +8,11 @@ def render_summary_ui():
     st.subheader("📝 Smart Video Summary")
 
     transcript_text = st.session_state.transcript_text
+
+    if not transcript_text:
+        st.warning("⚠️ No transcript available to summarize.")
+        return
+
     word_count = len(transcript_text.split())
 
     if word_count > 6000:
@@ -36,7 +41,7 @@ def render_summary_ui():
 
             except Exception as error:
 
-                st.error("❌ Summary generation failed.")
+                st.warning("⚠️ Summary generation failed.")
 
                 with st.expander("Error Details"):
                     st.code(str(error), language="text")

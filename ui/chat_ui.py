@@ -19,6 +19,7 @@ def _stream_response(question, chat_history):
     response_placeholder = st.empty()
     
     full_response = ""
+    event_type = None
     
     try:
         # Connect to FastAPI SSE endpoint
@@ -83,11 +84,11 @@ def render_chat_ui():
                 st.caption("⚠️ Outside active memory window.")
 
     # ── chat input ────────────────────────────────────────
-    user_question = st.chat_input("Ask about this video…")
-
     if st.session_state.get("pending_question"):
         user_question = st.session_state.pending_question
         st.session_state.pending_question = None
+    else:
+        user_question = st.chat_input("Ask about this video…")
 
     if user_question:
         with st.chat_message("user"):
@@ -109,7 +110,7 @@ def render_chat_ui():
 
                 save_current_chat(st.session_state.chat_history)
             except Exception as error:
-                st.error("❌ Failed to generate response.")
+                st.warning("⚠️ Failed to generate response.")
                 with st.expander("Error Details"):
                     st.code(str(error), language="text")
 

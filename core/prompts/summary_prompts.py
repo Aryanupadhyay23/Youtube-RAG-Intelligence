@@ -11,75 +11,69 @@ class SectionSummary(BaseModel):
     end_time: int = Field(description="End time in seconds")
 
 CHUNK_SUMMARY_PROMPT = ChatPromptTemplate.from_messages([
-    ("system", """ROLE
-You are a transcription summarizer.
+    ("system", """You are a transcription summarizer.
+Your task is to create a concise factual summary of ONLY the provided transcript chunk.
 
-TASK
-Create a concise factual summary of ONLY this chunk.
+RULES:
+- Do not add information.
+- Preserve important technical concepts, names, terminology, numbers, and examples.
+- Remove filler and repetition.
+- Do not refer to the chunk as "this chunk".
+- Write a useful standalone summary."""),
+    ("human", """Transcript chunk:
+{chunk}
 
-INPUTS
-Transcript chunk: {chunk}
 Timestamp: {timestamp}
 
-RULES
-- Do not add information.
-- Preserve important technical concepts.
-- Remove filler and repetition.
-- Preserve important names, terminology, numbers, and examples.
-- Do not interpret beyond the text.
-- Do not refer to the chunk as "this chunk".
-- Write a useful standalone summary.
-""")
+Please summarize this chunk.""")
 ])
 
 SECTION_SUMMARY_PROMPT = ChatPromptTemplate.from_messages([
-    ("system", """ROLE
-You are a section summarizer.
+    ("system", """You are a section summarizer.
+Your task is to identify the main topic being discussed across this group of chunk summaries.
 
-TASK
-Identify the main topic being discussed across this group of chunks.
+RULES:
+- Combine related information and remove repeated points.
+- Preserve important technical details and do not introduce new facts.
+- Maintain logical order.
+- Keep timestamps associated with the appropriate topic."""),
+    ("human", """Chunk summaries:
+{chunk_summaries}
 
-INPUTS
-Chunk summaries: {chunk_summaries}
 Timestamps: {timestamps}
 
-RULES
-- Combine related information.
-- Remove repeated points.
-- Preserve important technical details.
-- Do not introduce new facts.
-- Maintain logical order.
-- Keep timestamps associated with the appropriate topic.
-""")
+Please summarize this section.""")
 ])
 
 FINAL_SUMMARY_PROMPT = ChatPromptTemplate.from_messages([
-    ("system", """ROLE
-You are a video summarizer.
-
-TASK
-Produce the complete video summary based ONLY on the provided section summaries.
+    ("system", """You are an expert video summarizer.
+Produce a complete, comprehensive video summary based ONLY on the provided section summaries.
 
 OUTPUT STRUCTURE:
 ## Overview
-[Short overview]
+[Concise overview of the video]
 
 ## Key Topics
 ### [Topic 1]
-...
+[Details]
+
+### [Topic 2]
+[Details]
 
 ## Key Takeaways
-- ...
+- [Key point 1]
+- [Key point 2]
+- [Key point 3]
 
-RULES
+RULES:
 - Base the summary only on the provided section summaries.
-- Do not introduce external information.
-- Do not hallucinate missing sections.
+- Do not introduce external information or hallucinate facts.
 - Preserve the video's logical progression.
 - Avoid repeating the same idea.
-- Prefer useful information over generic statements.
+- Prefer useful information over generic statements."""),
+    ("human", """Here is the transcript content from the video:
 
-INPUTS:
 {section_summaries}
-""")
+
+Please generate the complete video summary following the output structure.""")
 ])

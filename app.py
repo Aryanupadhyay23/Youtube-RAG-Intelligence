@@ -6,7 +6,6 @@ from config import (
     APP_TITLE,
     APP_CAPTION,
     GROQ_API_KEY,
-    GEMINI_API_KEY,
     SUPADATA_KEYS,
 )
 
@@ -73,8 +72,8 @@ st.divider()
 # ── load video ────────────────────────────────────────────
 if load_button:
 
-    if not (GEMINI_API_KEY or GROQ_API_KEY):
-        st.warning("⚠️ GEMINI_API_KEY / GOOGLE_API_KEY is missing.")
+    if not GROQ_API_KEY:
+        st.warning("⚠️ GROQ_API_KEY is missing.")
 
     elif not SUPADATA_KEYS:
         st.warning("⚠️ No Supadata keys found.")

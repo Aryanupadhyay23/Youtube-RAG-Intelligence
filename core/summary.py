@@ -17,10 +17,15 @@ from utils.constants import (
 )
 
 
+from core.llm import load_summary_llm
+
+
 def generate_summary(
     transcript_text,
-    llm,
+    llm=None,
 ):
+    if llm is None:
+        llm = load_summary_llm()
 
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=SUMMARY_CHUNK_SIZE,

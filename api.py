@@ -102,9 +102,18 @@ async def chat_stream(req: ChatRequest):
                     
                 # Stream the actual tokens from the LLM inside generate_answer
                 elif kind == "on_chat_model_stream":
-                    chunk = event["data"]["chunk"].content
-                    if chunk:
-                        yield f"event: token\ndata: {json.dumps({'token': chunk})}\n\n"
+                    raw_chunk = event["data"]["chunk"].content
+                    token_text = ""
+                    if isinstance(raw_chunk, str):
+                        token_text = raw_chunk
+                    elif isinstance(raw_chunk, list):
+                        for part in raw_chunk:
+                            if isinstance(part, dict) and "text" in part:
+                                token_text += part["text"]
+                            elif isinstance(part, str):
+                                token_text += part
+                    if token_text:
+                        yield f"event: token\ndata: {json.dumps({'token': token_text})}\n\n"
                         
             yield "event: end\ndata: {}\n\n"
         except Exception as e:

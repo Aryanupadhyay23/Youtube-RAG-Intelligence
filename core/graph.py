@@ -132,7 +132,17 @@ async def generate_answer(state: RAGState, config: RunnableConfig) -> RAGState:
     llm = config["configurable"]["llm"]
     response = await llm.ainvoke(messages, config)
     
-    return {"answer": response.content}
+    answer_text = response.content
+    if isinstance(answer_text, list):
+        text_parts = []
+        for part in answer_text:
+            if isinstance(part, dict) and "text" in part:
+                text_parts.append(part["text"])
+            elif isinstance(part, str):
+                text_parts.append(part)
+        answer_text = "".join(text_parts)
+        
+    return {"answer": answer_text}
 
 def route_after_evaluation(state: RAGState):
     score = state["retrieval_score"]

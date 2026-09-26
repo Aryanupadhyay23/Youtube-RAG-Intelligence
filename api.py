@@ -74,16 +74,20 @@ async def chat_stream(req: ChatRequest):
         "query": req.query,
         "chat_history": req.chat_history,
         "video_id": req.video_id,
-        "vector_store": stores["vector_store"],
-        "bm25_retriever": stores["bm25_retriever"],
-        # LLM needs to be initialized. We can import here to avoid global init issues.
-        "llm": __import__("core.llm", fromlist=["load_llm"]).load_llm(),
         "retrieval_attempt": 0,
         "context": ""
     }
     
     thread_id = f"{req.video_id}_{req.chat_id}"
-    config = {"configurable": {"thread_id": thread_id}}
+    config = {
+        "configurable": {
+            "thread_id": thread_id,
+            "vector_store": stores["vector_store"],
+            "bm25_retriever": stores["bm25_retriever"],
+            # LLM needs to be initialized. We can import here to avoid global init issues.
+            "llm": __import__("core.llm", fromlist=["load_llm"]).load_llm()
+        }
+    }
 
     async def event_generator():
         # Yield meaningful Server-Sent Events (SSE) by streaming the graph execution

@@ -1,7 +1,7 @@
 import streamlit as st
 
 from core.summary import generate_summary
-
+from core.llm import load_llm
 
 def render_summary_ui():
 
@@ -26,10 +26,10 @@ def render_summary_ui():
         with st.spinner("Generating summary…"):
 
             try:
-
+                llm = st.session_state.llm if st.session_state.llm else load_llm()
                 summary = generate_summary(
                     transcript_text=transcript_text,
-                    llm=st.session_state.llm,
+                    llm=llm,
                 )
 
                 st.session_state.summary = summary

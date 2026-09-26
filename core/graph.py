@@ -26,9 +26,6 @@ class RAGState(TypedDict):
     context: str
     answer: str
     video_id: str
-    vector_store: any
-    bm25_retriever: any
-    llm: any
 
 def format_docs_with_timestamps(docs):
     formatted = []
@@ -41,7 +38,9 @@ def format_docs_with_timestamps(docs):
         formatted.append(f"Content: {doc.page_content}\nSource: {url}")
     return "\n\n".join(formatted)
 
-async def _rephrase_query(state: RAGState, prompt, output_schema, **kwargs) -> RAGState:
+from langchain_core.runnables import RunnableConfig
+
+async def _rephrase_query(state: RAGState, prompt, output_schema, llm, **kwargs) -> RAGState:
     query = state.get("rewritten_query", state["query"])
     history = state.get("chat_history", [])
     
@@ -50,7 +49,7 @@ async def _rephrase_query(state: RAGState, prompt, output_schema, **kwargs) -> R
         native_history.append(HumanMessage(content=h['user']))
         native_history.append(AIMessage(content=h['ai']))
     
-    structured_llm = state["llm"].with_structured_output(output_schema)
+    structured_llm = llm.with_structured_output(output_schema)
     messages = prompt.format_messages(chat_history=native_history, **kwargs)
     
     response = await structured_llm.ainvoke(messages)
@@ -63,15 +62,16 @@ async def _rephrase_query(state: RAGState, prompt, output_schema, **kwargs) -> R
     logger.info(f"Query updated: '{query}' -> '{new_query}'")
     return {"rewritten_query": new_query}
 
-async def rewrite_query(state: RAGState) -> RAGState:
+async def rewrite_query(state: RAGState, config: RunnableConfig) -> RAGState:
     if not state.get("chat_history"):
         return {"rewritten_query": state["query"]}
-    return await _rephrase_query(state, REWRITE_PROMPT, RewriteResult, question=state["query"])
+    llm = config["configurable"]["llm"]
+    return await _rephrase_query(state, REWRITE_PROMPT, RewriteResult, llm, question=state["query"])
 
-async def hybrid_retrieve_node(state: RAGState) -> RAGState:
+async def hybrid_retrieve_node(state: RAGState, config: RunnableConfig) -> RAGState:
     query = state.get("rewritten_query", state["query"])
-    vector_store = state["vector_store"]
-    bm25 = state["bm25_retriever"]
+    vector_store = config["configurable"]["vector_store"]
+    bm25 = config["configurable"]["bm25_retriever"]
     attempt = state.get("retrieval_attempt", 0) + 1
     
     docs = await hybrid_retrieve(query, vector_store, bm25)
@@ -79,10 +79,10 @@ async def hybrid_retrieve_node(state: RAGState) -> RAGState:
     logger.info(f"Retrieval attempt {attempt}: found {len(docs)} documents.")
     return {"retrieved_documents": docs, "retrieval_attempt": attempt}
 
-async def evaluate_retrieval(state: RAGState) -> RAGState:
-    docs = state["retrieved_documents"]
+async def evaluate_retrieval(state: RAGState, config: RunnableConfig) -> RAGState:
+    docs = state.get("retrieved_documents", [])
     query = state.get("rewritten_query", state["query"])
-    llm = state["llm"]
+    llm = config["configurable"]["llm"]
     
     if not docs:
         return {"retrieval_score": "POOR"}
@@ -97,9 +97,10 @@ async def evaluate_retrieval(state: RAGState) -> RAGState:
     logger.info(f"Retrieval graded as: {grade} (Score: {response.score}, Reason: {response.reason})")
     return {"retrieval_score": grade}
 
-async def correct_query(state: RAGState) -> RAGState:
+async def correct_query(state: RAGState, config: RunnableConfig) -> RAGState:
+    llm = config["configurable"]["llm"]
     return await _rephrase_query(
-        state, CORRECTIVE_PROMPT, CorrectResult, 
+        state, CORRECTIVE_PROMPT, CorrectResult, llm,
         original_query=state["query"], failed_query=state.get("rewritten_query", state["query"])
     )
 
@@ -109,7 +110,7 @@ async def web_search(state: RAGState) -> RAGState:
     logger.info("Web search used as fallback.")
     return {"context": f"[WEB SEARCH RESULTS]\n{results}"}
 
-async def generate_answer(state: RAGState) -> RAGState:
+async def generate_answer(state: RAGState, config: RunnableConfig) -> RAGState:
     if not state.get("context") and state.get("retrieved_documents"):
         state["context"] = format_docs_with_timestamps(state["retrieved_documents"])
         
@@ -128,7 +129,10 @@ async def generate_answer(state: RAGState) -> RAGState:
         query=query
     )
     
-    return {"answer": messages}
+    llm = config["configurable"]["llm"]
+    response = await llm.ainvoke(messages, config)
+    
+    return {"answer": response.content}
 
 def route_after_evaluation(state: RAGState):
     score = state["retrieval_score"]

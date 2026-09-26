@@ -10,3 +10,8 @@ build/
 .idea/
 .vscode/
 *.sqlite
+# Ignore SQLite databases
+*.sqlite
+*.sqlite3
+*.sqlite-shm
+*.sqlite-wal

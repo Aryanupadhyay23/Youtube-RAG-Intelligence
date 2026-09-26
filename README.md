@@ -125,20 +125,23 @@ TAVILY_API_KEY=your_tavily_api_key_here
 
 > Never commit `.env` to git. It is already listed in `.gitignore`.
 
-### 5. Run
+### 5. Run the Application
 
+The application consists of a FastAPI backend and a Streamlit frontend. You need to run **both** for the application to work correctly.
+
+**Terminal 1 (Backend API):**
+```bash
+fastapi dev api.py
+# OR
+uvicorn api:app --reload --port 8000
+```
+
+**Terminal 2 (Frontend UI):**
 ```bash
 streamlit run app.py
 ```
 
 Open http://localhost:8501 in your browser.
-
-### 6. Run API Server (Optional)
-
-We also provide an asynchronous FastAPI endpoint with Server-Sent Events (SSE) for streaming graph execution:
-```bash
-uvicorn api:app --reload --port 8000
-```
 
 ---
 

@@ -1,28 +1,25 @@
 FROM python:3.11-slim
 
-# HuggingFace Spaces requires a non-root user
+# Create non-root user
 RUN useradd -m -u 1000 appuser
 
 WORKDIR /app
 
-# Install dependencies first (layer caching)
+# Install dependencies first for better layer caching
 COPY requirements.txt .
+
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy project files
+# Copy application files
 COPY --chown=appuser:appuser . .
 
-# Switch to non-root user
+# Run as non-root user
 USER appuser
 
-# HuggingFace Spaces expects port 7860
+# Hugging Face Spaces public port
 EXPOSE 7860
 
 ENV PYTHONUNBUFFERED=1
 
-# Disable Streamlit's dev warnings + bind to all interfaces
-CMD ["streamlit", "run", "app.py", \
-     "--server.port=7860", \
-     "--server.address=0.0.0.0", \
-     "--server.fileWatcherType=none", \
-     "--browser.gatherUsageStats=false"]
+# Start FastAPI internally and Streamlit publicly
+CMD ["sh", "-c", "uvicorn api:app --host 0.0.0.0 --port 8000 & exec streamlit run app.py --server.port=7860 --server.address=0.0.0.0 --server.fileWatcherType=none --browser.gatherUsageStats=false"]

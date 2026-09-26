@@ -1,6 +1,6 @@
 from typing import List
 from langchain_core.documents import Document
-from langchain_community.retrievers import EnsembleRetriever
+from langchain_classic.retrievers import EnsembleRetriever
 import asyncio
 
 from utils.constants import SEMANTIC_TOP_K, BM25_TOP_K, FINAL_TOP_K, RRF_K

@@ -3,7 +3,7 @@ import asyncio
 from config import TAVILY_API_KEY
 
 try:
-    from langchain_community.tools.tavily_search import TavilySearchResults
+    from langchain_tavily import TavilySearchResults
     if TAVILY_API_KEY:
         os.environ["TAVILY_API_KEY"] = TAVILY_API_KEY
         search_tool = TavilySearchResults(max_results=3)

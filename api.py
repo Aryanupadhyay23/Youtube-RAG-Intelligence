@@ -1,15 +1,18 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import List, Dict, Any
 import json
 import asyncio
+import logging
 from langgraph.checkpoint.memory import MemorySaver
 from contextlib import asynccontextmanager
 
 from core.graph import build_langgraph
 from core.vectorstore import build_retrievers
 from services.transcript_service import fetch_transcript
+
+logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -37,22 +40,26 @@ class ChatRequest(BaseModel):
 @app.post("/init")
 async def init_video(req: InitRequest):
     """Initialize a video: fetch transcript and build vector store."""
-    if req.video_id in app.state.video_stores:
-        return {"status": "already initialized"}
+    try:
+        if req.video_id in app.state.video_stores:
+            return {"status": "already initialized"}
+            
+        if not req.transcript_segments:
+            transcript_text, transcript_segments = await asyncio.to_thread(fetch_transcript, req.video_id)
+        else:
+            transcript_segments = req.transcript_segments
+            
+        vector_store, bm25_retriever = await asyncio.to_thread(build_retrievers, req.video_id, transcript_segments)
         
-    if not req.transcript_segments:
-        transcript_text, transcript_segments = await asyncio.to_thread(fetch_transcript, req.video_id)
-    else:
-        transcript_segments = req.transcript_segments
+        app.state.video_stores[req.video_id] = {
+            "vector_store": vector_store,
+            "bm25_retriever": bm25_retriever
+        }
         
-    vector_store, bm25_retriever = await asyncio.to_thread(build_retrievers, req.video_id, transcript_segments)
-    
-    app.state.video_stores[req.video_id] = {
-        "vector_store": vector_store,
-        "bm25_retriever": bm25_retriever
-    }
-    
-    return {"status": "success", "segments": len(transcript_segments)}
+        return {"status": "success", "segments": len(transcript_segments)}
+    except Exception as e:
+        logger.error(f"Error initializing video {req.video_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/chat/stream")
 async def chat_stream(req: ChatRequest):

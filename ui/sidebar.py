@@ -11,6 +11,7 @@ from utils.constants import APP_TITLE, APP_CAPTION
 from config import (
     IS_HUGGINGFACE,
     GROQ_API_KEY,
+    GEMINI_API_KEY,
     SUPADATA_KEYS,
 )
 
@@ -27,7 +28,7 @@ def _render_env_status():
 
     with st.expander("🔑 Key Status"):
 
-        groq_ok = bool(GROQ_API_KEY)
+        gemini_ok = bool(GEMINI_API_KEY)
         supa_ok = len(SUPADATA_KEYS) > 0
 
         st.markdown(
@@ -35,9 +36,9 @@ def _render_env_status():
         )
 
         st.markdown(
-            f"{'✅' if groq_ok else '❌'} "
-            f"`GROQ_API_KEY` "
-            f"{'loaded' if groq_ok else 'missing'}"
+            f"{'✅' if gemini_ok else '❌'} "
+            f"`GEMINI_API_KEY` "
+            f"{'loaded' if gemini_ok else 'missing'}"
         )
 
         st.markdown(

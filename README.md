@@ -9,7 +9,7 @@ app_port: 7860
 
 # YouTube RAG Intelligence
 
-An AI-powered YouTube video assistant built with LangGraph, LangChain, Groq LLaMA 3.3, Google Gemini embeddings, LangChain native EnsembleRetriever, and ChromaDB. Chat with any video, generate summaries, and explore transcripts.
+An AI-powered YouTube video assistant built with LangGraph, LangChain, openai/gpt-oss-120b, Google Gemini embeddings, LangChain native EnsembleRetriever, and ChromaDB. Chat with any video, generate summaries, and explore transcripts.
 
 > Transcripts in any language are automatically answered in English.
 
@@ -34,7 +34,7 @@ An AI-powered YouTube video assistant built with LangGraph, LangChain, Groq LLaM
 
 | Layer | Technology |
 |---|---|
-| LLM | Groq LLaMA 3.3 70B |
+| LLM | openai/gpt-oss-120b (via Groq API) |
 | Orchestration | LangGraph & LangChain |
 | Embeddings | Google Gemini-embedding-2 |
 | Vector Store | Hybrid ChromaDB + BM25 |

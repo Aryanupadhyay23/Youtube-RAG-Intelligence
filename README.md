@@ -1,3 +1,12 @@
+---
+title: YouTube RAG Intelligence
+emoji: 🎥
+colorFrom: blue
+colorTo: purple
+sdk: docker
+app_port: 7860
+---
+
 # YouTube RAG Intelligence
 
 An AI-powered YouTube video assistant built with LangGraph, LangChain, Groq LLaMA 3.3, Google Gemini embeddings, LangChain native EnsembleRetriever, and ChromaDB. Chat with any video, generate summaries, and explore transcripts.

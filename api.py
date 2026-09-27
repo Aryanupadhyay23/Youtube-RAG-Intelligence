@@ -97,7 +97,7 @@ async def chat_stream(req: ChatRequest):
                 name = event["name"]
                 
                 # Stream graph node transitions (e.g., hybrid_retrieve, evaluate_retrieval)
-                if kind == "on_chain_start" and name in ["hybrid_retrieve", "evaluate_retrieval", "correct_query", "web_search", "generate_answer"]:
+                if kind == "on_chain_start" and name in ["rewrite_query", "hybrid_retrieve", "evaluate_retrieval", "correct_query", "web_search", "generate_answer"]:
                     yield f"event: status\ndata: {json.dumps({'message': f'Starting node: {name}'})}\n\n"
                     
                 # Stream the actual tokens from the LLM inside generate_answer

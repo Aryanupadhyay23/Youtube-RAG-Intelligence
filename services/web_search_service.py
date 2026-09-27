@@ -1,35 +1,30 @@
-import os
-import asyncio
 from config import TAVILY_API_KEY
 
-try:
-    from langchain_tavily import TavilySearchResults
-    if TAVILY_API_KEY:
-        os.environ["TAVILY_API_KEY"] = TAVILY_API_KEY
-        search_tool = TavilySearchResults(max_results=3)
-    else:
-        search_tool = None
-except ImportError:
-    search_tool = None
 
 async def fallback_web_search(query: str) -> str:
-    """
-    Perform an async fallback web search using Tavily.
-    """
-    if search_tool is None or not TAVILY_API_KEY:
-        return "Web search is currently unavailable (TAVILY_API_KEY not configured or library missing)."
-        
+    """Perform an async fallback web search using Tavily."""
+    if not TAVILY_API_KEY:
+        return "Web search is currently unavailable (TAVILY_API_KEY not configured)."
+
     try:
-        results = await asyncio.to_thread(search_tool.invoke, {"query": query})
-        
-        formatted_results = []
-        if isinstance(results, list):
-            for res in results:
-                title = res.get("title", "No Title")
-                content = res.get("content", "")
-                url = res.get("url", "")
-                formatted_results.append(f"Source: {title} ({url})\nContent: {content}")
-            return "\n\n".join(formatted_results)
-        return str(results)
+        try:
+            from langchain_tavily import TavilySearch
+            tool = TavilySearch(max_results=3, tavily_api_key=TAVILY_API_KEY)
+            response = await tool.ainvoke({"query": query})
+            items = response.get("results", []) if isinstance(response, dict) else response
+        except ImportError:
+            from langchain_community.tools.tavily_search import TavilySearchResults
+            tool = TavilySearchResults(max_results=3, tavily_api_key=TAVILY_API_KEY)
+            items = await tool.ainvoke({"query": query})
+
+        if not items:
+            return f"No web search results found for '{query}'."
+
+        formatted = [
+            f"Source: {r.get('title', 'Web')} ({r.get('url', '')})\nContent: {r.get('content', '')}"
+            for r in items if isinstance(r, dict)
+        ]
+        return "\n\n".join(formatted)
+
     except Exception as e:
-        return f"Web search failed: {str(e)}"
+        return f"Web search failed: {e}"

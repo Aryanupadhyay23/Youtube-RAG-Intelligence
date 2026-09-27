@@ -13,7 +13,7 @@ def render_landing_page():
         st.markdown("#### 💬 RAG Chat")
         st.caption(
             "Ask questions grounded strictly in the video's transcript context. "
-            "Powered by FAISS retrieval and Groq LLaMA 3.3."
+            "Powered by Hybrid RAG (Chroma + BM25) and fast Groq inference."
         )
 
     with col2:

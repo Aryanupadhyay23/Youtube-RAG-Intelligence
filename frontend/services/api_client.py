@@ -7,8 +7,9 @@ from typing import Generator, Dict, Any, List
 API_BASE_URL = os.environ.get("BACKEND_API_URL", "http://127.0.0.1:8000")
 
 
+@st.cache_data(ttl=10, show_spinner=False)
 def check_api_health() -> bool:
-    """Check if the backend FastAPI service is reachable."""
+    """Check if the backend FastAPI service is reachable (cached for 10s)."""
     try:
         r = requests.get(f"{API_BASE_URL}/health", timeout=3)
         return r.status_code == 200
@@ -73,7 +74,7 @@ def initialize_video(
         "transcript_text": transcript_text or "",
         "transcript_segments": transcript_segments or [],
     }
-    r = requests.post(f"{API_BASE_URL}/init", json=payload, timeout=60)
+    r = requests.post(f"{API_BASE_URL}/init", json=payload, timeout=180)
     r.raise_for_status()
     return r.json()
 

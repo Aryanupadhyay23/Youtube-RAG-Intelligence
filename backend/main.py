@@ -3,10 +3,10 @@ from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Dict, Any
+import re
 import json
 import asyncio
 import logging
-from langgraph.checkpoint.memory import MemorySaver
 from contextlib import asynccontextmanager
 
 from backend.core.graph import build_langgraph
@@ -24,9 +24,8 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # In-memory checkpointer for conversation memory
-    app.state.checkpointer = MemorySaver()
-    app.state.rag_graph = build_langgraph(checkpointer=app.state.checkpointer)
+    # Pure stateless LangGraph execution (prevents RAM leaks from storing turns in MemorySaver)
+    app.state.rag_graph = build_langgraph()
 
     # Periodic background task to sweep inactive videos from RAM
     stop_event = asyncio.Event()
@@ -99,7 +98,7 @@ app = FastAPI(title="YouTube RAG Intelligence API", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -155,12 +154,11 @@ def health():
 
 @app.post("/reset")
 async def reset_cache(video_id: str = ""):
-    """Explicitly evict video vector store or clear all active stores from RAM."""
-    if video_id:
-        app.state.video_stores.evict(video_id)
-        return {"status": "evicted", "video_id": video_id}
-    app.state.video_stores.clear()
-    return {"status": "all_cleared"}
+    """Explicitly evict a specific video vector store from RAM."""
+    if not video_id:
+        raise HTTPException(status_code=400, detail="video_id is required to evict a session.")
+    app.state.video_stores.evict(video_id)
+    return {"status": "evicted", "video_id": video_id}
 
 
 @app.get("/api/logs/dates")
@@ -172,6 +170,8 @@ def get_log_dates():
 @app.get("/api/logs")
 def get_logs(date: str = "", level: str = "", query: str = ""):
     """Retrieve datewise logs formatted in clean Markdown."""
+    if date and not re.fullmatch(r"^\d{4}-\d{2}-\d{2}$", date):
+        raise HTTPException(status_code=400, detail="Invalid date format. Expected YYYY-MM-DD.")
     md_content = get_datewise_logs_markdown(date_str=date or None, level_filter=level or None, search_query=query)
     return {"markdown": md_content, "date": date}
 

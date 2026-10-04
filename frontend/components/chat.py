@@ -1,6 +1,6 @@
 import streamlit as st
 from frontend.utils.constants import MEMORY_WINDOW, QUICK_QUESTIONS
-from frontend.services.api_client import stream_chat
+from frontend.services.api_client import stream_chat, initialize_video
 from frontend.services.chat_storage import save_current_chat
 from frontend.utils.timestamp import linkify_timestamps
 
@@ -58,14 +58,37 @@ def render_chat_ui():
                     st.error("⚠️ No video loaded. Please load a video first.")
                     return
 
-                # Stream responses from backend API
+                # Stream responses from backend API with automatic session re-init if evicted
                 has_error = False
-                for event in stream_chat(
-                    video_id=video_id,
-                    chat_id=chat_id,
-                    query=user_question,
-                    chat_history=chat_history[-MEMORY_WINDOW:],
-                ):
+
+                def stream_with_retry():
+                    for attempt in range(2):
+                        encountered_eviction = False
+                        for event in stream_chat(
+                            video_id=video_id,
+                            chat_id=chat_id,
+                            query=user_question,
+                            chat_history=chat_history[-MEMORY_WINDOW:],
+                        ):
+                            val_str = str(event.get("value", "")).lower()
+                            if event["type"] == "error" and ("not initialized" in val_str or "not found" in val_str) and attempt == 0:
+                                encountered_eviction = True
+                                break
+                            yield event
+
+                        if encountered_eviction:
+                            status_box.caption("🔄 Session expired. Re-initializing video...")
+                            try:
+                                segments = st.session_state.get("transcript_segments", [])
+                                text = st.session_state.get("transcript_text", "")
+                                initialize_video(video_id=video_id, transcript_segments=segments, transcript_text=text)
+                            except Exception as reinit_err:
+                                yield {"type": "error", "value": f"Re-initialization failed: {reinit_err}"}
+                                break
+                            continue
+                        break
+
+                for event in stream_with_retry():
                     event_type = event["type"]
                     value = event["value"]
 

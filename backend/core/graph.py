@@ -102,7 +102,9 @@ async def evaluate_retrieval(state: RAGState, config: RunnableConfig) -> RAGStat
         return {"retrieval_score": "POOR"}
 
     query = state.get("rewritten_query", state["query"])
-    messages = GRADER_PROMPT.format_messages(question=query, document=docs[0].page_content)
+    # Grade against top 3 chunks combined so an introductory first chunk doesn't falsely cause POOR grading
+    combined_content = "\n\n---\n\n".join(d.page_content for d in docs[:3])
+    messages = GRADER_PROMPT.format_messages(question=query, document=combined_content)
     try:
         response = await config["configurable"]["llm"].with_structured_output(GradeResult).ainvoke(messages)
         grade = "GOOD" if getattr(response, "relevant", True) else "POOR"
@@ -124,18 +126,22 @@ async def correct_query(state: RAGState, config: RunnableConfig) -> RAGState:
 async def web_search(state: RAGState) -> RAGState:
     query = state.get("rewritten_query", state["query"])
     results = await fallback_web_search(query)
-    logger.info("Web search used as fallback.")
-    return {"context": f"[WEB SEARCH RESULTS]\n{results}"}
+    logger.info("Web search used as supplementary/fallback context.")
+    transcript_part = ""
+    if state.get("retrieved_documents"):
+        transcript_part = f"[VIDEO TRANSCRIPT CONTEXT]\n{format_docs_with_timestamps(state['retrieved_documents'])}\n\n"
+    return {"context": f"{transcript_part}[WEB SEARCH RESULTS]\n{results}"}
 
 
 async def generate_answer(state: RAGState, config: RunnableConfig) -> RAGState:
     if not state.get("context") and state.get("retrieved_documents"):
         state["context"] = format_docs_with_timestamps(state["retrieved_documents"])
 
+    # Pass original user query to prompt so LLM responds in the user's native language & tone
     messages = ANSWER_PROMPT.format_messages(
         context=state.get("context", ""),
         chat_history=format_chat_history(state.get("chat_history", [])),
-        query=state.get("rewritten_query", state["query"]),
+        query=state["query"],
     )
 
     response = await config["configurable"]["llm"].ainvoke(messages, config)

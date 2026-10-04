@@ -22,11 +22,12 @@ jobs:
 
           echo "📡 Sending 24-hour keep-alive ping to Hugging Face Space: $SPACE_URL..."
           
-          # 1. Ping the /keep-alive backend endpoint
-          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -L "$SPACE_URL/keep-alive" || echo "failed")
-          echo "Endpoint response status: $HTTP_STATUS"
+          # 1. Ping Streamlit's official health endpoint on port 7860
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -L "$SPACE_URL/_stcore/health" || echo "failed")
+          echo "Streamlit health status: $HTTP_STATUS"
 
-          # 2. Ping the public Space webpage
+          # 2. Ping Space direct URL and public page
+          curl -s -L -f -o /dev/null "$SPACE_URL" || true
           curl -s -L -f -o /dev/null "$REPO_URL" || true
           
           echo "✅ Keep-alive ping completed. 48-hour inactivity timer has been successfully reset."

@@ -21,15 +21,9 @@ def initialize_session():
 
 
 def reset_video_state():
-    """Reset all video, transcript, chat, and summary state to return to landing page."""
-    old_id = st.session_state.get("video_id")
-    if old_id:
-        try:
-            from frontend.services.api_client import reset_backend_video
-            reset_backend_video(old_id)
-        except Exception:
-            pass
-
+    """Reset all video, transcript, chat, and summary state to return to landing page.
+    Backend cache is managed via TTL and LRU, so we don't evict shared video stores here.
+    """
     st.session_state.video_id = None
     st.session_state.metadata = None
     st.session_state.transcript_text = None

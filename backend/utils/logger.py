@@ -1,5 +1,7 @@
 import os
 import sys
+import re
+import html
 import logging
 import traceback
 import tempfile
@@ -43,9 +45,10 @@ class MarkdownLogFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         time_str = datetime.fromtimestamp(record.created).strftime("%H:%M:%S")
         level_badge = self.LEVEL_BADGES.get(record.levelname, f"`{record.levelname}`")
-        module_name = record.name
+        module_name = html.escape(str(record.name))
 
-        msg = record.getMessage()
+        # Sanitize message to prevent HTML/XSS injection
+        msg = html.escape(record.getMessage())
         lines = [
             f"### `{time_str}` | {level_badge} | `{module_name}`",
             f"> **Message:** {msg}",
@@ -143,18 +146,29 @@ def get_datewise_logs_markdown(
     """
     Fetch and filter datewise logs directly formatted as clean Markdown.
     Includes header statistics: Total entries, Errors count, Warnings count.
+    Protected against path traversal attacks.
     """
     if not date_str:
         date_str = datetime.now().strftime("%Y-%m-%d")
 
-    log_file = LOGS_DIR / f"{date_str}.md"
+    # Path traversal protection: validate strict YYYY-MM-DD format
+    if not re.fullmatch(r"^\d{4}-\d{2}-\d{2}$", date_str):
+        return "⚠️ Invalid date format. Date must strictly be in YYYY-MM-DD format."
+
+    log_file = (LOGS_DIR / f"{date_str}.md").resolve()
+    # Ensure resolved path is strictly inside LOGS_DIR
+    try:
+        log_file.relative_to(LOGS_DIR.resolve())
+    except ValueError:
+        return "⚠️ Unauthorized log path access denied."
+
     if not log_file.exists():
         return f"### 📋 Logs for `{date_str}`\n\n> *No log entries recorded for this date yet.*"
 
     try:
         content = log_file.read_text(encoding="utf-8")
     except Exception as e:
-        return f"⚠️ Error reading log file `{log_file.name}`: {e}"
+        return f"⚠️ Error reading log file: {e}"
 
     if not content.strip():
         return f"### 📋 Logs for `{date_str}`\n\n> *Log file for `{date_str}` is empty.*"

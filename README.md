@@ -34,7 +34,7 @@ An AI-powered YouTube video assistant built with LangGraph, LangChain, openai/gp
 
 | Layer | Technology |
 |---|---|
-| LLM | openai/gpt-oss-120b (via Groq API) |
+| LLM | openai.gpt-oss-20b-1:0 (via AWS Bedrock) |
 | Orchestration | LangGraph & LangChain |
 | Embeddings | Google Gemini-embedding-2 |
 | Vector Store | Hybrid ChromaDB + BM25 |
@@ -59,7 +59,7 @@ backend/
         chunking.py           <- Timestamp-aware document chunking
         embeddings.py         <- Gemini embeddings loader
         graph.py              <- LangGraph RAG workflow
-        llm.py                <- Groq & Ollama LLM loaders
+        llm.py                <- AWS Bedrock GPT-OSS-20B loader (Groq/Ollama commented out)
         prompts/              <- RAG & summary system prompts
         retrieval.py          <- Hybrid ChromaDB + BM25 retrieval
         summary.py            <- Map-reduce summarisation engine
@@ -126,7 +126,13 @@ pip install -r requirements.txt
 Create a `.env` file in the root of the project:
 
 ```env
-GROQ_API_KEY=your_groq_api_key_here
+AWS_ACCESS_KEY_ID=your_aws_access_key_id_here
+AWS_SECRET_ACCESS_KEY=your_aws_secret_access_key_here
+AWS_REGION=us-east-1
+BEDROCK_MODEL_ID=openai.gpt-oss-20b-1:0
+BEDROCK_SUMMARY_MODEL_ID=openai.gpt-oss-20b-1:0
+# Previously Used Groq API (Commented out):
+# GROQ_API_KEY=your_groq_api_key_here
 SUPADATA_KEY_1=your_supadata_key_here
 SUPADATA_KEY_2=your_second_supadata_key_here
 SUPADATA_KEY_3=your_third_supadata_key_here
@@ -176,7 +182,9 @@ Add each of the following:
 
 | Secret Name | Required | Where to Get It |
 |---|---|---|
-| `GROQ_API_KEY` | Required | https://console.groq.com |
+| `AWS_ACCESS_KEY_ID` | Required | AWS IAM Console |
+| `AWS_SECRET_ACCESS_KEY` | Required | AWS IAM Console |
+| `AWS_REGION` | Optional (default: `us-east-1`) | AWS Bedrock Region |
 | `SUPADATA_KEY_1` | Required | https://supadata.ai |
 | `SUPADATA_KEY_2` | Optional | Fallback if key 1 hits rate limit |
 | `SUPADATA_KEY_3` | Optional | Fallback if key 2 hits rate limit |

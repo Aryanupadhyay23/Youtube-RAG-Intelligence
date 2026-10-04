@@ -4,10 +4,20 @@ from dotenv import load_dotenv
 from backend.utils.constants import *
 
 # Load .env file
-load_dotenv(override=False)
+load_dotenv(override=True)
 
-# API Keys
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
+# --- Groq Configuration (Qwen 3.8 27B with 3 Fallback Keys) ---
+GROQ_API_KEYS = [
+    key for key in [
+        os.environ.get("GROQ_API_KEY_1"),
+        os.environ.get("GROQ_API_KEY_2"),
+        os.environ.get("GROQ_API_KEY_3"),
+        os.environ.get("GROQ_API_KEY"),
+    ]
+    if key and key.strip()
+]
+GROQ_MODEL = os.environ.get("GROQ_MODEL") or LLM_MODEL
+
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
 TAVILY_API_KEY = os.environ.get("TAVILY_API_KEY")
 HF_TOKEN = os.environ.get("HF_TOKEN", "")
@@ -18,6 +28,7 @@ SUPADATA_KEYS = [
     if (key := os.environ.get(f"SUPADATA_KEY_{i}") or os.environ.get(f"SUPADATA_KEY_{['ONE','TWO','THREE','FOUR'][i-1]}"))
 ]
 
-# Ollama Host & Key Configuration
-OLLAMA_API_KEY = os.environ.get("OLLAMA") or os.environ.get("OLLAMA_API_KEY", "")
-OLLAMA_HOST = os.environ.get("OLLAMA_HOST") or os.environ.get("OLLAMA_BASE_URL", "https://ollama.com")
+# --- Ollama Configuration (For Video Summaries) ---
+OLLAMA_API_KEY = os.environ.get("OLLAMA_API_KEY") or os.environ.get("OLLAMA", "")
+OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "https://ollama.com")
+OLLAMA_SUMMARY_MODEL = os.environ.get("OLLAMA_SUMMARY_MODEL", "gpt-oss:20b")

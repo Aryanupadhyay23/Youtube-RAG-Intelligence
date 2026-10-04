@@ -20,8 +20,8 @@ RRF_K = 60
 MAX_RETRIEVAL_ATTEMPTS = 2
 
 # Model Names
-LLM_MODEL = "openai/gpt-oss-120b"
-SUMMARY_MODEL = "gpt-oss:120b-cloud"
+LLM_MODEL = "qwen/qwen3.8-27b"
+SUMMARY_MODEL = "qwen/qwen3.8-27b"
 EMBEDDING_MODEL = "models/gemini-embedding-2"
 LLM_TEMPERATURE = 0.3
 

@@ -12,7 +12,7 @@ def render_landing_page():
         st.markdown("#### 💬 RAG Chat")
         st.caption(
             "Ask questions grounded strictly in the video's transcript context. "
-            "Powered by Hybrid RAG (Chroma + BM25) and fast Groq inference."
+            "Powered by Hybrid RAG (Chroma + BM25) and AWS Bedrock (openai.gpt-oss-20b-1:0)."
         )
 
     with col2:

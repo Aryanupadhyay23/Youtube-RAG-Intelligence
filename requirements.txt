@@ -6,10 +6,16 @@ langchain-community==0.4.1
 langchain-classic>=1.0.0
 langchain-tavily>=0.2.0
 langchain-text-splitters==1.1.2
+# Groq LLM Provider (for GPT-OSS-20B)
 langchain-groq==1.1.2
-langchain-google-genai>=2.0.0
-
 groq==0.37.1
+
+# AWS Bedrock & Ollama (Available for alternative use)
+langchain-aws>=0.2.0
+boto3>=1.34.0
+# langchain-ollama==1.1.0
+
+langchain-google-genai>=2.0.0
 
 chromadb>=0.5.5
 sentence-transformers==5.4.1
@@ -26,7 +32,6 @@ requests==2.33.1
 watchdog==6.0.0
 
 langgraph==1.2.0
-langchain-ollama==1.1.0
 
 rank_bm25==0.2.2
 tavily-python==0.3.3

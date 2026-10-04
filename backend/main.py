@@ -15,6 +15,7 @@ from backend.core.summary import generate_summary
 from backend.services.transcript_service import fetch_transcript
 from backend.services.youtube_service import get_video_metadata, extract_video_id
 
+# Powered by Ollama for both Chat & Summaries
 logger = logging.getLogger(__name__)
 
 
@@ -63,6 +64,7 @@ class SummaryRequest(BaseModel):
 # ── Endpoints ────────────────────────────────────────────────────────────────
 
 @app.get("/health")
+@app.get("/api/health")
 def health():
     """Health check endpoint for Docker, AWS CodeDeploy, and monitoring."""
     return {"status": "healthy", "service": "YouTube RAG Intelligence Backend"}
@@ -123,10 +125,14 @@ async def chat_stream(req: ChatRequest):
 
     inputs = {
         "query": req.query,
+        "rewritten_query": req.query,
         "chat_history": req.chat_history,
         "video_id": req.video_id,
         "retrieval_attempt": 0,
+        "retrieved_documents": [],
+        "retrieval_score": "",
         "context": "",
+        "answer": "",
     }
 
     thread_id = f"{req.video_id}_{req.chat_id}"

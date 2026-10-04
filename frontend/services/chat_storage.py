@@ -4,7 +4,7 @@ import streamlit as st
 
 def create_new_chat():
     """Create a new chat session."""
-    chat_id = f"chat_{int(time.time())}"
+    chat_id = f"chat_{int(time.time() * 1000)}"
     if "all_chats" not in st.session_state:
         st.session_state.all_chats = {}
 

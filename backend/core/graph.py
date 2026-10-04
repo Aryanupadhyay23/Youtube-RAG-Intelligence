@@ -56,10 +56,13 @@ async def _rephrase_query(state: RAGState, prompt, output_schema, llm, **kwargs)
         **kwargs
     )
 
-    response = await llm.with_structured_output(output_schema).ainvoke(messages)
-    new_query = getattr(response, "standalone_query", getattr(response, "corrected_query", query))
-
-    if hasattr(response, "needs_rewrite") and not response.needs_rewrite:
+    try:
+        response = await llm.with_structured_output(output_schema).ainvoke(messages)
+        new_query = getattr(response, "standalone_query", getattr(response, "corrected_query", query))
+        if hasattr(response, "needs_rewrite") and not response.needs_rewrite:
+            new_query = query
+    except Exception as e:
+        logger.warning(f"Structured output error in _rephrase_query: {e}. Fallback to query.")
         new_query = query
 
     logger.info(f"Query updated: '{query}' -> '{new_query}'")
@@ -92,10 +95,14 @@ async def evaluate_retrieval(state: RAGState, config: RunnableConfig) -> RAGStat
 
     query = state.get("rewritten_query", state["query"])
     messages = GRADER_PROMPT.format_messages(question=query, document=docs[0].page_content)
-    response = await config["configurable"]["llm"].with_structured_output(GradeResult).ainvoke(messages)
+    try:
+        response = await config["configurable"]["llm"].with_structured_output(GradeResult).ainvoke(messages)
+        grade = "GOOD" if getattr(response, "relevant", True) else "POOR"
+    except Exception as e:
+        logger.warning(f"Grading fallback to GOOD: {e}")
+        grade = "GOOD"
 
-    grade = "GOOD" if response.relevant else "POOR"
-    logger.info(f"Retrieval graded as: {grade} (Score: {response.score}, Reason: {response.reason})")
+    logger.info(f"Retrieval graded as: {grade}")
     return {"retrieval_score": grade}
 
 

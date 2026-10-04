@@ -4,7 +4,7 @@ import requests
 import streamlit as st
 from typing import Generator, Dict, Any, List
 
-API_BASE_URL = os.environ.get("BACKEND_API_URL", "http://localhost:8000")
+API_BASE_URL = os.environ.get("BACKEND_API_URL", "http://127.0.0.1:8000")
 
 
 def check_api_health() -> bool:
@@ -82,6 +82,10 @@ def stream_chat(
                         pass
     except requests.exceptions.ConnectionError:
         yield {"type": "error", "value": "Could not connect to backend server. Is port 8000 running?"}
+    except requests.exceptions.Timeout:
+        yield {"type": "error", "value": "Request timed out. The backend may be overloaded. Try again."}
+    except requests.exceptions.HTTPError as e:
+        yield {"type": "error", "value": f"Backend returned error: {e.response.status_code}"}
     except Exception as e:
         yield {"type": "error", "value": str(e)}
 
@@ -89,6 +93,19 @@ def stream_chat(
 def request_summary(transcript_text: str) -> str:
     """Call backend /summary to generate video summary."""
     payload = {"transcript_text": transcript_text}
-    r = requests.post(f"{API_BASE_URL}/summary", json=payload, timeout=180)
-    r.raise_for_status()
-    return r.json().get("summary", "")
+    try:
+        r = requests.post(f"{API_BASE_URL}/summary", json=payload, timeout=180)
+        r.raise_for_status()
+        result = r.json()
+        return result.get("summary", "")
+    except requests.exceptions.ConnectionError:
+        raise ConnectionError("Cannot connect to backend server. Is it running on port 8000?")
+    except requests.exceptions.Timeout:
+        raise TimeoutError("Summary request timed out after 3 minutes. Try again.")
+    except requests.exceptions.HTTPError as e:
+        # Try to extract the detail message from FastAPI error response
+        try:
+            detail = e.response.json().get("detail", str(e))
+        except Exception:
+            detail = str(e)
+        raise RuntimeError(f"Backend error (HTTP {e.response.status_code}): {detail}")

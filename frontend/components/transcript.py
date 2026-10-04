@@ -39,14 +39,24 @@ def render_transcript_ui():
         if not filtered:
             st.info("No matching segments found.")
         else:
-            st.caption(f"{len(filtered):,} segments found")
-            for seg in filtered:
+            total_segments = len(filtered)
+            limit = st.session_state.get("transcript_display_limit", 60)
+            displayed = filtered[:limit]
+
+            st.caption(f"Showing {min(limit, total_segments):,} of {total_segments:,} segments")
+
+            for seg in displayed:
                 timestamp = format_time(seg["start"])
                 yt_url = build_youtube_timestamp_url(video_id=video_id, seconds=int(seg["start"]))
 
                 c1, c2 = st.columns([1, 7])
                 c1.link_button(timestamp, yt_url, use_container_width=True)
                 c2.write(seg["text"])
+
+            if total_segments > limit:
+                if st.button("➕ Load Next 60 Segments", use_container_width=True):
+                    st.session_state.transcript_display_limit = limit + 60
+                    st.rerun()
 
     st.divider()
     col1, col2 = st.columns(2)

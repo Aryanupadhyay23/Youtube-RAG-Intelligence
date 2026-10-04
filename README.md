@@ -125,14 +125,13 @@ pip install -r requirements.txt
 
 Create a `.env` file in the root of the project:
 
-```env
-AWS_ACCESS_KEY_ID=your_aws_access_key_id_here
-AWS_SECRET_ACCESS_KEY=your_aws_secret_access_key_here
-AWS_REGION=us-east-1
-BEDROCK_MODEL_ID=openai.gpt-oss-20b-1:0
-BEDROCK_SUMMARY_MODEL_ID=openai.gpt-oss-20b-1:0
-# Previously Used Groq API (Commented out):
-# GROQ_API_KEY=your_groq_api_key_here
+# Ollama Configuration (Video Summaries & Chat with Fallback Keys):
+OLLAMA_API_KEY_ONE=your_primary_ollama_api_key
+OLLAMA_API_KEY_SECOND=your_second_ollama_api_key
+OLLAMA_API_KEY_THIRD=your_third_ollama_api_key
+OLLAMA_HOST=https://ollama.com
+OLLAMA_SUMMARY_MODEL=gpt-oss:20b
+
 SUPADATA_KEY_1=your_supadata_key_here
 SUPADATA_KEY_2=your_second_supadata_key_here
 SUPADATA_KEY_3=your_third_supadata_key_here

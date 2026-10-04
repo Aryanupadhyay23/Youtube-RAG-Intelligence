@@ -11,10 +11,6 @@ You are a conversational memory manager.
 TASK
 Summarize the conversation to maintain context for future interactions.
 
-INPUTS
-Existing conversation summary: {existing_summary}
-New messages: {new_messages}
-
 RULES
 - Create a compact factual summary of what the user has asked, what has been discussed, and any important unresolved context.
 - Keep it compact.
@@ -22,5 +18,12 @@ RULES
 - Do not store irrelevant conversational filler.
 - Do not infer user preferences unless explicitly stated.
 - Only store information that is useful for continuing the conversation (e.g. "The user is currently asking about X").
-""")
+"""),
+    ("human", """Existing conversation summary:
+{existing_summary}
+
+New messages:
+{new_messages}
+
+Please provide an updated compact conversation summary.""")
 ])

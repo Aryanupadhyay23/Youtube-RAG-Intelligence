@@ -23,10 +23,10 @@ def render_chat_ui():
     total_turns = len(chat_history)
 
     for idx, turn in enumerate(chat_history):
-        with st.chat_message("user"):
-            st.write(turn["user"])
-        with st.chat_message("assistant"):
-            st.write(turn["ai"])
+        with st.chat_message("user", avatar="👤"):
+            st.markdown(turn["user"])
+        with st.chat_message("assistant", avatar="🤖"):
+            st.markdown(turn["ai"])
 
         if total_turns > MEMORY_WINDOW and idx < total_turns - MEMORY_WINDOW:
             st.caption("⚠️ Outside active memory window.")
@@ -39,19 +39,27 @@ def render_chat_ui():
         user_question = st.chat_input("Ask about this video…")
 
     if user_question:
-        with st.chat_message("user"):
-            st.write(user_question)
+        with st.chat_message("user", avatar="👤"):
+            st.markdown(user_question)
 
-        with st.chat_message("assistant"):
+        with st.chat_message("assistant", avatar="🤖"):
             status_box = st.empty()
             response_box = st.empty()
             full_response = ""
 
             try:
+                video_id = st.session_state.get("video_id", "")
+                chat_id = st.session_state.get("current_chat_id", "default_chat")
+
+                if not video_id:
+                    st.error("⚠️ No video loaded. Please load a video first.")
+                    return
+
                 # Stream responses from backend API
+                has_error = False
                 for event in stream_chat(
-                    video_id=st.session_state.get("video_id", ""),
-                    chat_id=st.session_state.get("current_chat_id", "default_chat"),
+                    video_id=video_id,
+                    chat_id=chat_id,
                     query=user_question,
                     chat_history=chat_history[-MEMORY_WINDOW:],
                 ):
@@ -59,12 +67,33 @@ def render_chat_ui():
                     value = event["value"]
 
                     if event_type == "status":
-                        status_box.caption(f"⚙️ {value}...")
+                        node_name = value.replace("Starting node: ", "")
+                        labels = {
+                            "rewrite_query": "🔍 Understanding query intent...",
+                            "hybrid_retrieve": "⚡ Searching video transcript & keywords...",
+                            "evaluate_retrieval": "🎯 Grading context relevance...",
+                            "correct_query": "🔄 Refining query for better matches...",
+                            "web_search": "🌐 Searching the web for additional context...",
+                            "generate_answer": "✍️ Synthesizing answer with timestamps...",
+                        }
+                        status_label = labels.get(node_name, f"⚙️ {value}...")
+                        status_box.caption(status_label)
                     elif event_type == "token":
+                        status_box.empty()
                         full_response += value
                         response_box.markdown(full_response + "▌")
                     elif event_type == "error":
-                        status_box.error(f"❌ {value}")
+                        status_box.empty()
+                        has_error = True
+
+                        # User-friendly error messages
+                        error_val = str(value)
+                        if "connect" in error_val.lower() or "Connection" in error_val:
+                            st.error("🔌 Cannot reach the backend. Please ensure the server is running on port 8000.")
+                        elif "timeout" in error_val.lower():
+                            st.error("⏱️ The request timed out. Try again or simplify your question.")
+                        else:
+                            st.error(f"❌ {value}")
 
                 # Final token output without cursor
                 if full_response:
@@ -75,8 +104,17 @@ def render_chat_ui():
                     chat_history.append({"user": user_question, "ai": full_response})
                     save_current_chat(chat_history)
 
+                elif not has_error:
+                    response_box.markdown("*No response was generated. Please try again.*")
+
             except Exception as e:
-                st.error(f"Error generating answer: {e}")
+                error_str = str(e)
+                if "connect" in error_str.lower():
+                    st.error("🔌 Cannot reach the backend server. Is it running?")
+                elif "timeout" in error_str.lower():
+                    st.error("⏱️ Request timed out. Try again.")
+                else:
+                    st.error(f"❌ Error: {error_str}")
 
     # Action Buttons: Clear & Export
     if chat_history:

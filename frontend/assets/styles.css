@@ -1,0 +1,38 @@
+.block-container {
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+}
+
+.stButton button {
+    border-radius: 8px;
+    height: 42px;
+    font-weight: 500;
+}
+
+.stDownloadButton button {
+    border-radius: 8px;
+    height: 42px;
+    font-weight: 500;
+}
+
+.stTextInput input {
+    border-radius: 8px;
+}
+
+.stTextArea textarea {
+    border-radius: 8px;
+}
+
+.stChatMessage {
+    border-radius: 10px;
+    padding: 12px;
+}
+
+.stTabs [data-baseweb="tab"] {
+    font-weight: 600;
+}
+
+.stMetric {
+    border-radius: 10px;
+    padding: 10px;
+}

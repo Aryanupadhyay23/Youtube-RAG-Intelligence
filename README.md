@@ -47,46 +47,49 @@ An AI-powered YouTube video assistant built with LangGraph, LangChain, openai/gp
 ## Project Structure
 
 ```
-app.py                        <- Streamlit entry point
-config.py                     <- API keys + environment detection
-requirements.txt
-Dockerfile
-assets/
-    styles.css
-core/
-    __init__.py
-    chunking.py
-    embeddings.py
-    graph.py
-    llm.py
-    prompts/
-    retrieval.py
-    summary.py
-    vectorstore.py
-exports/
-    __init__.py
-    export_chat.py
-    export_summary.py
-services/
-    __init__.py
-    chat_service.py
-    transcript_service.py
-    web_search_service.py
-    youtube_service.py
-ui/
-    __init__.py
-    chat_ui.py
-    landing.py
-    sidebar.py
-    summary_ui.py
-    transcript_ui.py
-utils/
-    __init__.py
-    constants.py
-    formatting.py
-    helpers.py
-    session.py
-    timestamp.py
+requirements.txt              <- Python dependencies
+Dockerfile                    <- Container build configuration
+appspec.yml                   <- AWS CodeDeploy configuration
+deploy/                       <- AWS CodeDeploy lifecycle scripts
+backend/
+    main.py                   <- FastAPI application & endpoints
+    config.py                 <- API keys & environment detection
+    requirements.txt          <- Backend dependencies
+    core/
+        chunking.py           <- Timestamp-aware document chunking
+        embeddings.py         <- Gemini embeddings loader
+        graph.py              <- LangGraph RAG workflow
+        llm.py                <- Groq & Ollama LLM loaders
+        prompts/              <- RAG & summary system prompts
+        retrieval.py          <- Hybrid ChromaDB + BM25 retrieval
+        summary.py            <- Map-reduce summarisation engine
+        vectorstore.py        <- Vector store initialization
+    services/
+        transcript_service.py <- Supadata transcript fetching
+        web_search_service.py <- Tavily web search fallback
+        youtube_service.py    <- Video metadata extraction
+    utils/
+        constants.py          <- Model configurations & constants
+        timestamp.py          <- Timestamp formatting utilities
+frontend/
+    app.py                    <- Streamlit UI entrypoint
+    requirements.txt          <- Frontend dependencies
+    assets/
+        styles.css            <- UI stylesheet
+    components/
+        chat.py               <- Streaming RAG chat interface
+        landing.py            <- Hero & empty state landing page
+        sidebar.py            <- Sidebar & video loading controls
+        summary.py            <- Summary tab & download buttons
+        transcript.py         <- Interactive transcript explorer
+    services/
+        api_client.py         <- Backend REST & SSE client
+        chat_storage.py       <- Chat session persistence
+    utils/
+        constants.py          <- UI constants
+        session.py            <- Streamlit session state management
+        timestamp.py          <- Timestamp formatting utilities
+        youtube.py            <- Video URL parsing utility
 ```
 
 ---
@@ -140,14 +143,12 @@ The application consists of a FastAPI backend and a Streamlit frontend. You need
 
 **Terminal 1 (Backend API):**
 ```bash
-fastapi dev api.py
-# OR
-uvicorn api:app --reload --port 8000
+uvicorn backend.main:app --reload --port 8000
 ```
 
 **Terminal 2 (Frontend UI):**
 ```bash
-streamlit run app.py
+streamlit run frontend/app.py
 ```
 
 Open http://localhost:8501 in your browser.
@@ -206,17 +207,11 @@ __pycache__/
 Required files to upload:
 
 ```
-app.py
-config.py
 requirements.txt
 Dockerfile
 README.md
-assets/
-core/
-exports/
-services/
-ui/
-utils/
+backend/
+frontend/
 ```
 
 ### Step 4 - Verify Deployment

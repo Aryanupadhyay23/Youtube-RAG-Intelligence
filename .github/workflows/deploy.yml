@@ -1,0 +1,205 @@
+name: YouTube RAG Production Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+    inputs:
+      enable_aws:
+        description: "Deploy to AWS? (set to true or false)"
+        required: true
+        default: "true"
+
+permissions:
+  contents: write
+
+env:
+  # ─── ON/OFF TOGGLE FOR AWS ──────────────────────────────────────────────────
+  # Change to "false" whenever you want to pause/stop AWS deployments to save costs.
+  # Hugging Face will continue deploying automatically!
+  ENABLE_AWS: "true"
+
+  # ─── AWS CONFIGURATION ──────────────────────────────────────────────────────
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: youtube-rag-intelligence
+  S3_DEPLOYMENT_BUCKET: youtube-rag-intelligence-deployment
+  CODEDEPLOY_APPLICATION_NAME: youtube-rag-intelligence-app
+  CODEDEPLOY_DEPLOYMENT_GROUP: youtube-rag-intelligence-group
+
+  # ─── HUGGING FACE CONFIGURATION ─────────────────────────────────────────────
+  HF_SPACE: Aryan2301/YouTube_RAG_Intelligence
+
+
+jobs:
+  # ───────────────────────────────────────────────────────────────────────────
+  # 1. CI - Validate Code and Dependencies
+  # ───────────────────────────────────────────────────────────────────────────
+  ci:
+    name: CI - Code Validation & Smoke Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8
+          pip install -r requirements.txt
+
+      - name: Lint Critical Errors
+        run: |
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+
+      - name: Verify Python Compilation
+        run: |
+          python -m py_compile backend/main.py frontend/app.py
+          python -c "
+          import py_compile, os
+          for root, _, files in os.walk('.'):
+              if any(p in root for p in ['.git', '__pycache__', '.venv']): continue
+              for f in files:
+                  if f.endswith('.py'): py_compile.compile(os.path.join(root, f), doraise=True)
+          print('All Python modules compiled successfully!')
+          "
+
+      - name: Run Core Smoke Test
+        run: |
+          python -c "
+          from backend.core.chunking import create_timestamp_aware_chunks
+          from backend.core.graph import build_langgraph
+          graph = build_langgraph()
+          assert graph is not None
+          print('CI Validation Passed successfully!')
+          "
+
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # 2. CD - Deploy to Hugging Face Spaces (Always kept in sync)
+  # ───────────────────────────────────────────────────────────────────────────
+  deploy-huggingface:
+    name: CD - Deploy to Hugging Face Spaces
+    needs: ci
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - name: Push to Hugging Face Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          if [ -z "$HF_TOKEN" ]; then
+            echo "⚠️ HF_TOKEN secret is missing. Skipping Hugging Face sync."
+            exit 0
+          fi
+          git config --global user.email "actions@github.com"
+          git config --global user.name "GitHub Actions"
+          git remote add space "https://Aryan2301:$HF_TOKEN@huggingface.co/spaces/${{ env.HF_SPACE }}"
+          git push --force space HEAD:main
+
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # 3. CD - Deploy to AWS (ECR -> S3 -> CodeDeploy -> EC2)
+  # ───────────────────────────────────────────────────────────────────────────
+  deploy-aws:
+    name: CD - Build, Test, Push & Deploy to AWS
+    needs: ci
+    if: env.ENABLE_AWS == 'true' || github.event.inputs.enable_aws == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          load: true
+          tags: app:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run Container Health Test
+        run: |
+          # Start the container locally in runner
+          docker run -d --name test_container \
+            -p 8000:8000 \
+            -p 7860:7860 \
+            app:${{ github.sha }}
+
+          # Wait up to 30 seconds for FastAPI /health
+          for i in {1..15}; do
+            sleep 2
+            if curl -s http://localhost:8000/health | grep healthy; then
+              echo "✅ API is healthy!"
+              break
+            fi
+          done
+
+          # Final health verification check
+          curl --fail http://localhost:8000/health
+
+          docker stop test_container
+          docker rm test_container
+
+      - name: Tag and Push Image to Amazon ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          docker tag app:${{ github.sha }} $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+          docker tag app:${{ github.sha }} $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:latest
+
+          docker push $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+          docker push $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:latest
+
+      - name: Package Deployment Files
+        run: |
+          zip -r deployment.zip \
+            appspec.yml \
+            deploy/scripts/install_dependencies.sh \
+            deploy/scripts/stop_docker.sh \
+            deploy/scripts/start_docker.sh
+
+      - name: Upload Deployment Zip to S3
+        run: |
+          aws s3 cp deployment.zip s3://${{ env.S3_DEPLOYMENT_BUCKET }}/deployment.zip
+
+      - name: Trigger CodeDeploy
+        run: |
+          aws deploy create-deployment \
+            --application-name ${{ env.CODEDEPLOY_APPLICATION_NAME }} \
+            --deployment-group-name ${{ env.CODEDEPLOY_DEPLOYMENT_GROUP }} \
+            --deployment-config-name CodeDeployDefault.OneAtATime \
+            --s3-location bucket=${{ env.S3_DEPLOYMENT_BUCKET }},key=deployment.zip,bundleType=zip \
+            --file-exists-behavior OVERWRITE \
+            --region ${{ env.AWS_REGION }}

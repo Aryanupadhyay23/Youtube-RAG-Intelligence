@@ -2,14 +2,28 @@ import os
 import sys
 import logging
 import traceback
+import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
-# Project root logs directory
+# Project root logs directory with fallback to system temp directory for container permissions
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 LOGS_DIR = PROJECT_ROOT / "logs"
-LOGS_DIR.mkdir(parents=True, exist_ok=True)
+
+try:
+    LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    # Test writability
+    _test_file = LOGS_DIR / ".write_test"
+    _test_file.touch()
+    _test_file.unlink()
+except (PermissionError, OSError):
+    # Graceful fallback to /tmp/youtube_rag_logs (guaranteed writable on Hugging Face Spaces and Docker)
+    LOGS_DIR = Path(tempfile.gettempdir()) / "youtube_rag_logs"
+    try:
+        LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
 
 
 class MarkdownLogFormatter(logging.Formatter):
@@ -62,7 +76,10 @@ class DatewiseDailyFileHandler(logging.Handler):
     def __init__(self, logs_dir: Path):
         super().__init__()
         self.logs_dir = logs_dir
-        self.logs_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            self.logs_dir.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pass
 
     def emit(self, record: logging.LogRecord):
         try:

@@ -15,8 +15,9 @@ RUN apt-get update \
     && apt-get purge -y --auto-remove build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy application files
+# Copy application files and ensure logs directory permissions
 COPY --chown=appuser:appuser . .
+RUN mkdir -p /app/logs && chown -R appuser:appuser /app/logs && chmod 777 /app/logs
 
 # Run as non-root user
 USER appuser

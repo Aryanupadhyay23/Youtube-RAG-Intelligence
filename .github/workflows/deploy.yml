@@ -7,41 +7,100 @@ on:
       - master
   workflow_dispatch:
     inputs:
-      enable_aws:
-        description: "Deploy to AWS? (set to true or false)"
+      execute_pipeline:
+        description: "Authorize CI/CD & Deployments?"
+        type: boolean
         required: true
-        default: "true"
+        default: true
+      enable_huggingface:
+        description: "Deploy to Hugging Face Spaces?"
+        type: boolean
+        required: true
+        default: true
+      enable_aws:
+        description: "Deploy to AWS (ECR/S3/CodeDeploy)?"
+        type: boolean
+        required: true
+        default: true
+
+# Ensure only one deployment runs at a time per branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: write
 
 env:
-  # ─── ON/OFF TOGGLE FOR AWS ──────────────────────────────────────────────────
-  # Change to "false" whenever you want to pause/stop AWS deployments to save costs.
-  # Hugging Face will continue deploying automatically!
+  # ─── 🔒 MASTER CI/CD PERMISSION ───────────────────────────────────────────
+  # Set to "true" ONLY when you want GitHub Actions to run CI and deploy.
+  # Set to "false" to pause/block automatic execution on git push.
+  EXECUTE_PIPELINE: "false"
+
+  # ─── 🚀 PLATFORM TOGGLES ──────────────────────────────────────────────────
+  ENABLE_HUGGINGFACE: "true"
   ENABLE_AWS: "true"
 
-  # ─── AWS CONFIGURATION ──────────────────────────────────────────────────────
+  # ─── CLOUD CONFIGURATION ──────────────────────────────────────────────────
+  HF_SPACE: Aryan2301/YouTube_RAG_Intelligence
   AWS_REGION: us-east-1
   ECR_REPOSITORY: youtube-rag-intelligence
   S3_DEPLOYMENT_BUCKET: youtube-rag-intelligence-deployment
   CODEDEPLOY_APPLICATION_NAME: youtube-rag-intelligence-app
   CODEDEPLOY_DEPLOYMENT_GROUP: youtube-rag-intelligence-group
 
-  # ─── HUGGING FACE CONFIGURATION ─────────────────────────────────────────────
-  HF_SPACE: Aryan2301/YouTube_RAG_Intelligence
-
 
 jobs:
   # ───────────────────────────────────────────────────────────────────────────
-  # 1. CI - Validate Code and Dependencies
+  # 0. Gatekeeper: Verify Execution Permission & Platform Targets
+  # ───────────────────────────────────────────────────────────────────────────
+  verify-permission:
+    name: 🔒 Verify Execution Permission
+    runs-on: ubuntu-latest
+    outputs:
+      authorized: ${{ steps.gatekeeper.outputs.authorized }}
+      deploy_hf: ${{ steps.gatekeeper.outputs.deploy_hf }}
+      deploy_aws: ${{ steps.gatekeeper.outputs.deploy_aws }}
+    steps:
+      - name: Evaluate Permission
+        id: gatekeeper
+        run: |
+          # Evaluate master pipeline permission
+          if [ "${{ env.EXECUTE_PIPELINE }}" = "true" ] || [ "${{ inputs.execute_pipeline }}" = "true" ]; then
+            echo "authorized=true" >> $GITHUB_OUTPUT
+            echo "✅ Pipeline execution AUTHORIZED."
+          else
+            echo "authorized=false" >> $GITHUB_OUTPUT
+            echo "🛑 Pipeline execution BLOCKED (EXECUTE_PIPELINE is '${{ env.EXECUTE_PIPELINE }}')."
+            echo "ℹ️ Set EXECUTE_PIPELINE: 'true' in deploy.yml to enable."
+          fi
+
+          # Evaluate Hugging Face target
+          if [ "${{ env.ENABLE_HUGGINGFACE }}" = "true" ] && [ "${{ inputs.enable_huggingface }}" != "false" ]; then
+            echo "deploy_hf=true" >> $GITHUB_OUTPUT
+          else
+            echo "deploy_hf=false" >> $GITHUB_OUTPUT
+          fi
+
+          # Evaluate AWS target
+          if [ "${{ env.ENABLE_AWS }}" = "true" ] && [ "${{ inputs.enable_aws }}" != "false" ]; then
+            echo "deploy_aws=true" >> $GITHUB_OUTPUT
+          else
+            echo "deploy_aws=false" >> $GITHUB_OUTPUT
+          fi
+
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # 1. CI: Code Quality, Linting & Smoke Tests
   # ───────────────────────────────────────────────────────────────────────────
   ci:
     name: CI - Code Validation & Smoke Tests
+    needs: verify-permission
+    if: needs.verify-permission.outputs.authorized == 'true'
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout Source Code
         uses: actions/checkout@v4
 
       - name: Setup Python 3.12
@@ -54,42 +113,47 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install flake8
-          pip install -r requirements.txt
+          pip install flake8 -r requirements.txt
 
-      - name: Lint Critical Errors
+      - name: Lint Critical Syntax Errors
         run: |
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
 
-      - name: Verify Python Compilation
+      - name: Validate Python Compilation
         run: |
-          python -m py_compile backend/main.py frontend/app.py
           python -c "
           import py_compile, os
+          count = 0
           for root, _, files in os.walk('.'):
               if any(p in root for p in ['.git', '__pycache__', '.venv']): continue
               for f in files:
-                  if f.endswith('.py'): py_compile.compile(os.path.join(root, f), doraise=True)
-          print('All Python modules compiled successfully!')
+                  if f.endswith('.py'):
+                      py_compile.compile(os.path.join(root, f), doraise=True)
+                      count += 1
+          print(f'✅ Successfully compiled {count} Python files with zero syntax errors.')
           "
 
-      - name: Run Core Smoke Test
+      - name: Run Core Module Smoke Test
         run: |
           python -c "
           from backend.core.chunking import create_timestamp_aware_chunks
           from backend.core.graph import build_langgraph
+          from backend.utils.timestamp import format_timestamp, parse_timestamp_seconds
+          assert format_timestamp(65) == '01:05'
+          assert parse_timestamp_seconds('01:05') == 65
           graph = build_langgraph()
           assert graph is not None
-          print('CI Validation Passed successfully!')
+          print('✅ Core RAG & LangGraph smoke test passed.')
           "
 
 
   # ───────────────────────────────────────────────────────────────────────────
-  # 2. CD - Deploy to Hugging Face Spaces (Always kept in sync)
+  # 2. CD: Sync & Deploy to Hugging Face Spaces
   # ───────────────────────────────────────────────────────────────────────────
   deploy-huggingface:
-    name: CD - Deploy to Hugging Face Spaces
-    needs: ci
+    name: CD - Deploy to Hugging Face
+    needs: [verify-permission, ci]
+    if: needs.verify-permission.outputs.authorized == 'true' && needs.verify-permission.outputs.deploy_hf == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -99,27 +163,28 @@ jobs:
           fetch-depth: 0
           lfs: true
 
-      - name: Push to Hugging Face Space
+      - name: Deploy to Hugging Face Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           if [ -z "$HF_TOKEN" ]; then
-            echo "⚠️ HF_TOKEN secret is missing. Skipping Hugging Face sync."
+            echo "⚠️ HF_TOKEN secret not found. Skipping Hugging Face sync."
             exit 0
           fi
           git config --global user.email "actions@github.com"
           git config --global user.name "GitHub Actions"
           git remote add space "https://Aryan2301:$HF_TOKEN@huggingface.co/spaces/${{ env.HF_SPACE }}"
           git push --force space HEAD:main
+          echo "🚀 Successfully synced repository to Hugging Face Space: ${{ env.HF_SPACE }}"
 
 
   # ───────────────────────────────────────────────────────────────────────────
-  # 3. CD - Deploy to AWS (ECR -> S3 -> CodeDeploy -> EC2)
+  # 3. CD: Build Container, Push to ECR & Deploy to AWS EC2
   # ───────────────────────────────────────────────────────────────────────────
   deploy-aws:
-    name: CD - Build, Test, Push & Deploy to AWS
-    needs: ci
-    if: env.ENABLE_AWS == 'true' || github.event.inputs.enable_aws == 'true'
+    name: CD - Deploy to AWS (ECR & EC2)
+    needs: [verify-permission, ci]
+    if: needs.verify-permission.outputs.authorized == 'true' && needs.verify-permission.outputs.deploy_aws == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -133,14 +198,14 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Login to Amazon ECR
+      - name: Log in to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Setup Docker Buildx
+      - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build Docker Image
+      - name: Build Docker Image Locally
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -149,30 +214,27 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Run Container Health Test
+      - name: Test Container Health Check
         run: |
-          # Start the container locally in runner
           docker run -d --name test_container \
             -p 8000:8000 \
             -p 7860:7860 \
             app:${{ github.sha }}
 
-          # Wait up to 30 seconds for FastAPI /health
+          # Poll /health endpoint for up to 30 seconds
           for i in {1..15}; do
             sleep 2
-            if curl -s http://localhost:8000/health | grep healthy; then
-              echo "✅ API is healthy!"
+            if curl -sf http://localhost:8000/health | grep healthy; then
+              echo "✅ FastAPI container passed pre-deployment health check!"
               break
             fi
           done
 
-          # Final health verification check
           curl --fail http://localhost:8000/health
-
           docker stop test_container
           docker rm test_container
 
-      - name: Tag and Push Image to Amazon ECR
+      - name: Push Docker Image to Amazon ECR
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
@@ -181,8 +243,9 @@ jobs:
 
           docker push $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
           docker push $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:latest
+          echo "📦 Pushed image tags to ECR: ${{ github.sha }} and latest"
 
-      - name: Package Deployment Files
+      - name: Package CodeDeploy Bundle
         run: |
           zip -r deployment.zip \
             appspec.yml \
@@ -190,16 +253,19 @@ jobs:
             deploy/scripts/stop_docker.sh \
             deploy/scripts/start_docker.sh
 
-      - name: Upload Deployment Zip to S3
+      - name: Upload Deployment Artifact to S3
         run: |
           aws s3 cp deployment.zip s3://${{ env.S3_DEPLOYMENT_BUCKET }}/deployment.zip
 
-      - name: Trigger CodeDeploy
+      - name: Trigger AWS CodeDeploy
         run: |
-          aws deploy create-deployment \
+          DEPLOYMENT_ID=$(aws deploy create-deployment \
             --application-name ${{ env.CODEDEPLOY_APPLICATION_NAME }} \
             --deployment-group-name ${{ env.CODEDEPLOY_DEPLOYMENT_GROUP }} \
             --deployment-config-name CodeDeployDefault.OneAtATime \
             --s3-location bucket=${{ env.S3_DEPLOYMENT_BUCKET }},key=deployment.zip,bundleType=zip \
             --file-exists-behavior OVERWRITE \
-            --region ${{ env.AWS_REGION }}
+            --region ${{ env.AWS_REGION }} \
+            --query "deploymentId" \
+            --output text)
+          echo "🚀 AWS CodeDeploy deployment triggered successfully! Deployment ID: $DEPLOYMENT_ID"

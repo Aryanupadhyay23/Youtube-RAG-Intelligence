@@ -16,3 +16,6 @@ build/
 *.sqlite-shm
 *.sqlite-wal
 instructions.txt
+.cache/
+data/
+logs/

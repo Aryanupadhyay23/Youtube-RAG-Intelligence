@@ -14,6 +14,10 @@ def render_transcript_ui():
         st.warning("⚠️ No transcript data available for this video.")
         return
 
+    current_seek = int(st.session_state.get("player_start_time", 0))
+    with st.expander(f"🎬 Interactive Video Player (Seeking: {format_time(current_seek)})", expanded=True):
+        st.video(f"https://www.youtube.com/watch?v={video_id}", start_time=current_seek)
+
     col_mode, col_search = st.columns([1, 2])
     view_mode = col_mode.radio(
         "View Mode",
@@ -43,15 +47,18 @@ def render_transcript_ui():
             limit = st.session_state.get("transcript_display_limit", 60)
             displayed = filtered[:limit]
 
-            st.caption(f"Showing {min(limit, total_segments):,} of {total_segments:,} segments")
+            st.caption(f"Showing {min(limit, total_segments):,} of {total_segments:,} segments • Click ▶ to seek player, 🔗 to open YouTube")
 
-            for seg in displayed:
+            for idx, seg in enumerate(displayed):
                 timestamp = format_time(seg["start"])
                 yt_url = build_youtube_timestamp_url(video_id=video_id, seconds=int(seg["start"]))
 
-                c1, c2 = st.columns([1, 7])
-                c1.link_button(timestamp, yt_url, use_container_width=True)
-                c2.write(seg["text"])
+                c1, c2, c3 = st.columns([1.6, 0.6, 7.8])
+                if c1.button(f"▶ {timestamp}", key=f"seek_{idx}_{int(seg['start'])}", use_container_width=True, help="Seek player to this timestamp"):
+                    st.session_state.player_start_time = int(seg["start"])
+                    st.rerun()
+                c2.link_button("🔗", yt_url, help="Open on YouTube", use_container_width=True)
+                c3.write(seg["text"])
 
             if total_segments > limit:
                 if st.button("➕ Load Next 60 Segments", use_container_width=True):

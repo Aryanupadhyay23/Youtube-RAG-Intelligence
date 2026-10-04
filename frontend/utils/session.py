@@ -9,6 +9,7 @@ SESSION_DEFAULTS = {
     "chat_history": [],
     "pending_question": None,
     "current_chat_id": "default_chat",
+    "player_start_time": 0,
 }
 
 
@@ -21,6 +22,14 @@ def initialize_session():
 
 def reset_video_state():
     """Reset all video, transcript, chat, and summary state to return to landing page."""
+    old_id = st.session_state.get("video_id")
+    if old_id:
+        try:
+            from frontend.services.api_client import reset_backend_video
+            reset_backend_video(old_id)
+        except Exception:
+            pass
+
     st.session_state.video_id = None
     st.session_state.metadata = None
     st.session_state.transcript_text = None
@@ -32,3 +41,4 @@ def reset_video_state():
     st.session_state.all_chats = {}
     st.session_state.current_chat_id = "default_chat"
     st.session_state.transcript_display_limit = 60
+    st.session_state.player_start_time = 0

@@ -11,11 +11,14 @@ from contextlib import asynccontextmanager
 
 from backend.core.graph import build_langgraph
 from backend.core.vectorstore import build_retrievers
-from backend.core.summary import generate_summary
+from backend.core.summary import generate_summary, generate_summary_async, generate_summary_stream
+from backend.core.cache import EphemeralVideoStoreCache
 from backend.services.transcript_service import fetch_transcript
 from backend.services.youtube_service import get_video_metadata, extract_video_id
+from backend.utils.logger import setup_logging, get_available_log_dates, get_datewise_logs_markdown
 
-# Powered by Ollama for both Chat & Summaries
+# Initialize datewise Markdown logger
+setup_logging()
 logger = logging.getLogger(__name__)
 
 
@@ -24,7 +27,37 @@ async def lifespan(app: FastAPI):
     # In-memory checkpointer for conversation memory
     app.state.checkpointer = MemorySaver()
     app.state.rag_graph = build_langgraph(checkpointer=app.state.checkpointer)
-    yield
+
+    # Periodic background task to sweep inactive videos from RAM
+    stop_event = asyncio.Event()
+
+    async def periodic_cleanup():
+        while not stop_event.is_set():
+            try:
+                await asyncio.wait_for(stop_event.wait(), timeout=300)
+                break
+            except asyncio.TimeoutError:
+                pass
+            except asyncio.CancelledError:
+                break
+            try:
+                cleaned = app.state.video_stores.cleanup_expired()
+                if cleaned > 0:
+                    logger.info(f"Periodic sweep: Purged {cleaned} inactive video(s) from RAM.")
+            except Exception as e:
+                logger.warning(f"Error during periodic memory cleanup: {e}")
+
+    cleanup_task = asyncio.create_task(periodic_cleanup())
+    try:
+        yield
+    finally:
+        stop_event.set()
+        cleanup_task.cancel()
+        try:
+            await cleanup_task
+        except (asyncio.CancelledError, Exception):
+            pass
+        app.state.video_stores.clear()
 
 
 app = FastAPI(title="YouTube RAG Intelligence API", lifespan=lifespan)
@@ -38,8 +71,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# In-memory cache for vector stores and retrievers
-app.state.video_stores = {}
+# 100% In-Memory Ephemeral Cache with capacity + inactivity TTL eviction
+app.state.video_stores = EphemeralVideoStoreCache()
+
 
 
 # ── Schemas ──────────────────────────────────────────────────────────────────
@@ -70,21 +104,49 @@ def health():
     return {"status": "healthy", "service": "YouTube RAG Intelligence Backend"}
 
 
+@app.post("/reset")
+async def reset_cache(video_id: str = ""):
+    """Explicitly evict video vector store or clear all active stores from RAM."""
+    if video_id:
+        app.state.video_stores.evict(video_id)
+        return {"status": "evicted", "video_id": video_id}
+    app.state.video_stores.clear()
+    return {"status": "all_cleared"}
+
+
+@app.get("/api/logs/dates")
+def get_log_dates():
+    """Retrieve all available datewise log dates."""
+    return {"dates": get_available_log_dates()}
+
+
+@app.get("/api/logs")
+def get_logs(date: str = "", level: str = "", query: str = ""):
+    """Retrieve datewise logs formatted in clean Markdown."""
+    md_content = get_datewise_logs_markdown(date_str=date or None, level_filter=level or None, search_query=query)
+    return {"markdown": md_content, "date": date}
+
+
+
+
 @app.post("/init")
 async def init_video(req: InitRequest):
     """Initialize a video: fetch transcript, metadata, and build hybrid vector stores."""
     try:
-        if req.video_id in app.state.video_stores:
-            stored = app.state.video_stores[req.video_id]
+        # Check cache (in-memory LRU or lazy-loaded from persistent disk)
+        cached_entry = app.state.video_stores.get(req.video_id)
+        if cached_entry:
+            logger.info(f"Video '{req.video_id}' loaded from cache.")
             return {
                 "status": "already initialized",
                 "video_id": req.video_id,
-                "metadata": stored.get("metadata", {}),
-                "transcript_text": stored.get("transcript_text", ""),
-                "transcript_segments": stored.get("transcript_segments", []),
-                "segments": len(stored.get("transcript_segments", [])),
+                "metadata": cached_entry.get("metadata", {}),
+                "transcript_text": cached_entry.get("transcript_text", ""),
+                "transcript_segments": cached_entry.get("transcript_segments", []),
+                "segments": len(cached_entry.get("transcript_segments", [])),
             }
 
+        # Fetch transcript via primary (youtube_transcript_api) or fallback (Supadata)
         if not req.transcript_segments:
             transcript_text, transcript_segments = await asyncio.to_thread(fetch_transcript, req.video_id)
         else:
@@ -94,13 +156,16 @@ async def init_video(req: InitRequest):
         metadata = await asyncio.to_thread(get_video_metadata, req.video_id)
         vector_store, bm25_retriever = await asyncio.to_thread(build_retrievers, req.video_id, transcript_segments)
 
-        app.state.video_stores[req.video_id] = {
+        store_entry = {
             "vector_store": vector_store,
             "bm25_retriever": bm25_retriever,
             "metadata": metadata,
             "transcript_text": transcript_text,
             "transcript_segments": transcript_segments,
         }
+
+        # Store in two-tier LRU cache and persistent disk storage
+        app.state.video_stores.put(req.video_id, store_entry)
 
         return {
             "status": "success",
@@ -118,10 +183,11 @@ async def init_video(req: InitRequest):
 @app.post("/chat/stream")
 async def chat_stream(req: ChatRequest):
     """Stream chat response and graph events using Server-Sent Events (SSE)."""
-    if req.video_id not in app.state.video_stores:
-        return {"error": "Video not initialized. Call /init first."}
-
-    stores = app.state.video_stores[req.video_id]
+    stores = app.state.video_stores.get(req.video_id)
+    if not stores:
+        async def not_initialized_stream():
+            yield f"event: error\ndata: {json.dumps({'error': 'Video not initialized. Call /init first.'})}\n\n"
+        return StreamingResponse(not_initialized_stream(), media_type="text/event-stream")
 
     inputs = {
         "query": req.query,
@@ -158,8 +224,11 @@ async def chat_stream(req: ChatRequest):
                 ]:
                     yield f"event: status\ndata: {json.dumps({'message': f'Starting node: {name}'})}\n\n"
 
-                # Stream token chunks from the LLM
+                # Stream token chunks from the LLM only for final answer generation
                 elif kind == "on_chat_model_stream":
+                    current_node = event.get("metadata", {}).get("langgraph_node")
+                    if current_node and current_node != "generate_answer":
+                        continue
                     chunk = event["data"]["chunk"].content
                     if isinstance(chunk, list):
                         chunk = "".join(p.get("text", "") if isinstance(p, dict) else str(p) for p in chunk)
@@ -174,11 +243,31 @@ async def chat_stream(req: ChatRequest):
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
+@app.post("/summary/stream")
+async def summarize_stream(req: SummaryRequest):
+    """Stream smart summary generation progress events and final tokens via SSE."""
+    async def event_generator():
+        try:
+            async for event in generate_summary_stream(req.transcript_text):
+                event_type = event.get("type", "status")
+                if event_type == "status":
+                    yield f"event: status\ndata: {json.dumps({'message': event.get('message', '')})}\n\n"
+                elif event_type == "token":
+                    yield f"event: token\ndata: {json.dumps({'token': event.get('token', '')})}\n\n"
+                elif event_type == "end":
+                    yield "event: end\ndata: {}\n\n"
+        except Exception as e:
+            logger.error(f"Streaming summary error: {e}")
+            yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
 @app.post("/summary")
 async def summarize(req: SummaryRequest):
-    """Generate smart summary using single-pass or map-reduce."""
+    """Generate smart summary using parallel map-reduce."""
     try:
-        summary_text = await asyncio.to_thread(generate_summary, req.transcript_text)
+        summary_text = await generate_summary_async(req.transcript_text)
         return {"summary": summary_text}
     except Exception as e:
         logger.error(f"Summary generation error: {e}")

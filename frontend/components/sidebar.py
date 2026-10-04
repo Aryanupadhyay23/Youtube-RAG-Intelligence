@@ -101,3 +101,10 @@ def render_sidebar():
 
         else:
             st.caption("💡 Paste a YouTube link to start chatting.")
+
+        # Datewise Markdown System Logs Inspector
+        st.divider()
+        with st.expander("📋 System Logs (Markdown)", expanded=False):
+            from frontend.components.logs_viewer import render_logs_modal
+            render_logs_modal()
+

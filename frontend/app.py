@@ -7,16 +7,12 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 import streamlit as st
-import importlib
 import requests
-import frontend.services.api_client
-import frontend.utils.session
-importlib.reload(frontend.services.api_client)
-importlib.reload(frontend.utils.session)
 
 from frontend.utils.constants import APP_TITLE, APP_CAPTION
 from frontend.utils.youtube import extract_video_id
 from frontend.utils.session import initialize_session, reset_video_state
+from frontend.utils.timestamp import format_time
 from frontend.services.chat_storage import initialize_chat_state
 from frontend.services.api_client import initialize_video, check_api_health
 from frontend.components.sidebar import render_sidebar
@@ -101,6 +97,20 @@ if st.session_state.get("video_id") and st.session_state.get("transcript_text"):
 </div>
 </div>"""
     st.markdown(card_html, unsafe_allow_html=True)
+
+    # Embedded Interactive Video Player
+    current_seek = int(st.session_state.get("player_start_time", 0))
+    with st.expander(f"🎬 Video Player • Seek Time: {format_time(current_seek)}", expanded=False):
+        col_vid_player, col_vid_actions = st.columns([3, 1])
+        with col_vid_player:
+            st.video(f"https://www.youtube.com/watch?v={vid_id}", start_time=current_seek)
+        with col_vid_actions:
+            st.markdown(f"**Current Position:** `{format_time(current_seek)}`")
+            st.caption("Seek timestamp updates automatically when clicking timestamps in transcript explorer or citations.")
+            if current_seek > 0:
+                if st.button("⏮️ Play from 00:00", key="global_reset_seek", use_container_width=True):
+                    st.session_state.player_start_time = 0
+                    st.rerun()
 
     # Feature Tabs
     tab_chat, tab_summary, tab_transcript = st.tabs(["💬 Hybrid RAG Chat", "📝 Deep Summary", "📄 Transcript Explorer"])

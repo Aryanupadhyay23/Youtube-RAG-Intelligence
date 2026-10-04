@@ -13,7 +13,7 @@ from backend.core.prompts import (
 )
 from backend.services.web_search_service import fallback_web_search
 from backend.utils.constants import MAX_RETRIEVAL_ATTEMPTS, MEMORY_WINDOW
-from backend.utils.timestamp import get_youtube_timestamp_url
+from backend.utils.timestamp import get_youtube_timestamp_url, format_time
 
 logger = logging.getLogger(__name__)
 
@@ -31,11 +31,19 @@ class RAGState(TypedDict):
 
 
 def format_docs_with_timestamps(docs) -> str:
-    """Format retrieved documents with source timestamps."""
-    return "\n\n".join(
-        f"Content: {d.page_content}\nSource: {get_youtube_timestamp_url(d.metadata.get('video_id'), d.metadata.get('start_time', 0)) if d.metadata.get('video_id') else ''}"
-        for d in docs
-    )
+    """Format retrieved documents with human-readable timestamps and source links."""
+    formatted = []
+    for d in docs:
+        start_sec = d.metadata.get("start_time", 0)
+        end_sec = d.metadata.get("end_time", 0)
+        start_str = format_time(start_sec)
+        end_str = format_time(end_sec)
+        vid_id = d.metadata.get("video_id", "")
+        url = get_youtube_timestamp_url(vid_id, start_sec) if vid_id else ""
+        formatted.append(
+            f"Timestamp: [{start_str} - {end_str}] (Link: {url})\nContent: {d.page_content}"
+        )
+    return "\n\n".join(formatted)
 
 
 def format_chat_history(history: list) -> list:

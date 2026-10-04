@@ -70,7 +70,8 @@ RULES:
 - Do not introduce external information or hallucinate facts.
 - Preserve the video's logical progression.
 - Avoid repeating the same idea.
-- Prefer useful information over generic statements."""),
+- Prefer useful information over generic statements.
+- LANGUAGE: Generate the summary in the primary language of the video transcript (e.g., English, Hindi, Spanish), preserving native clarity."""),
     ("human", """Here is the transcript content from the video:
 
 {section_summaries}

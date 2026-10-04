@@ -46,3 +46,7 @@ OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "https://ollama.com")
 OLLAMA_SUMMARY_MODEL = os.environ.get("OLLAMA_SUMMARY_MODEL", "gpt-oss:20b")
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL") or OLLAMA_SUMMARY_MODEL
 
+# --- Ephemeral Vector Store Cache Configuration ---
+MAX_ACTIVE_VIDEOS = int(os.environ.get("MAX_ACTIVE_VIDEOS", "10"))
+VIDEO_INACTIVITY_TTL_MINUTES = int(os.environ.get("VIDEO_INACTIVITY_TTL_MINUTES", "45"))
+

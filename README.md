@@ -138,6 +138,10 @@ SUPADATA_KEY_3=your_third_supadata_key_here
 SUPADATA_KEY_4=your_fourth_supadata_key_here
 GOOGLE_API_KEY=your_google_api_key_here
 TAVILY_API_KEY=your_tavily_api_key_here
+
+# Ephemeral In-Memory Vector Store & Inactivity TTL:
+MAX_ACTIVE_VIDEOS=10
+VIDEO_INACTIVITY_TTL_MINUTES=45
 ```
 
 > Never commit `.env` to git. It is already listed in `.gitignore`.

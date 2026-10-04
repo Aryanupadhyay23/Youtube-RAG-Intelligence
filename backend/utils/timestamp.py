@@ -20,3 +20,13 @@ def get_youtube_timestamp_url(video_id: str, seconds: float) -> str:
 
 # Backwards-compatible alias
 build_youtube_timestamp_url = get_youtube_timestamp_url
+
+
+def parse_timestamp_seconds(ts: str) -> int:
+    """Convert HH:MM:SS or MM:SS string into integer seconds."""
+    parts = [int(p) for p in ts.strip("[]").split(":")]
+    if len(parts) == 3:
+        return parts[0] * 3600 + parts[1] * 60 + parts[2]
+    elif len(parts) == 2:
+        return parts[0] * 60 + parts[1]
+    return 0

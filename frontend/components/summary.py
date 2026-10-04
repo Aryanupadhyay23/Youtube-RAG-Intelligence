@@ -1,9 +1,9 @@
 import streamlit as st
-from frontend.services.api_client import request_summary
+from frontend.services.api_client import stream_summary, request_summary
 
 
 def render_summary_ui():
-    """Render smart video summary interface with generate and download options."""
+    """Render smart video summary interface with streaming generation and download options."""
     st.subheader("📝 Smart Video Summary")
 
     transcript_text = st.session_state.get("transcript_text")
@@ -13,33 +13,63 @@ def render_summary_ui():
 
     word_count = len(transcript_text.split())
     if word_count > 6000:
-        st.info(f"📦 Large transcript detected ({word_count:,} words). Map-reduce summarisation will be used.")
+        st.info(f"📦 Large transcript detected ({word_count:,} words). Parallel map-reduce summarisation will be used.")
     else:
         st.info(f"📄 {word_count:,} words detected. Single-pass summarisation will be used.")
 
     if st.button("✨ Generate Summary", type="primary"):
-        with st.spinner("🔄 Generating summary — this may take a moment…"):
-            try:
-                summary = request_summary(transcript_text)
-                if summary and summary.strip():
-                    st.session_state.summary = summary
-                else:
-                    st.warning("⚠️ Summary was empty. The model may have returned no content. Try again.")
-            except Exception as error:
-                error_str = str(error)
+        status_box = st.empty()
+        summary_box = st.empty()
+        full_summary = ""
+        has_error = False
 
-                # Provide user-friendly error messages
-                if "Connection" in error_str or "connect" in error_str.lower():
-                    st.error("🔌 Could not connect to the backend server. Please make sure it's running on port 8000.")
-                elif "timeout" in error_str.lower():
-                    st.error("⏱️ Summary generation timed out. The transcript may be too long, or the model is slow. Try again.")
-                elif "500" in error_str:
-                    st.error("⚠️ The summary model encountered an internal error. This usually means the Ollama service is down or the model is unavailable.")
-                else:
-                    st.error(f"❌ Summary generation failed: {error_str}")
+        status_box.caption("🔄 Connecting to summary engine…")
 
-                with st.expander("🔍 Technical Details"):
-                    st.code(error_str, language="text")
+        try:
+            for event in stream_summary(transcript_text):
+                event_type = event.get("type")
+                value = event.get("value", "")
+
+                if event_type == "status":
+                    status_box.caption(f"⚙️ {value}")
+                elif event_type == "token":
+                    status_box.empty()
+                    full_summary += value
+                    summary_box.markdown(full_summary + "▌")
+                elif event_type == "error":
+                    status_box.empty()
+                    has_error = True
+                    error_val = str(value)
+                    if "connection" in error_val.lower() or "connect" in error_val.lower():
+                        st.error("🔌 Could not connect to backend server on port 8000.")
+                    elif "timeout" in error_val.lower():
+                        st.error("⏱️ Summary request timed out. Please try again.")
+                    else:
+                        st.error(f"❌ {value}")
+                    break
+
+            if full_summary:
+                summary_box.markdown(full_summary)
+                status_box.empty()
+                st.session_state.summary = full_summary
+            elif not has_error:
+                # Fallback to synchronous request if streaming returned nothing
+                status_box.caption("🔄 Finalizing summary generation…")
+                fallback_summary = request_summary(transcript_text)
+                if fallback_summary and fallback_summary.strip():
+                    summary_box.markdown(fallback_summary)
+                    status_box.empty()
+                    st.session_state.summary = fallback_summary
+                else:
+                    status_box.empty()
+                    st.warning("⚠️ Summary was empty. Please try again.")
+
+        except Exception as error:
+            status_box.empty()
+            error_str = str(error)
+            st.error(f"❌ Summary generation failed: {error_str}")
+            with st.expander("🔍 Technical Details"):
+                st.code(error_str, language="text")
 
     if st.session_state.get("summary"):
         st.divider()

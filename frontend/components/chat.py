@@ -2,11 +2,14 @@ import streamlit as st
 from frontend.utils.constants import MEMORY_WINDOW, QUICK_QUESTIONS
 from frontend.services.api_client import stream_chat
 from frontend.services.chat_storage import save_current_chat
+from frontend.utils.timestamp import linkify_timestamps
 
 
 def render_chat_ui():
     """Render RAG Chat interface with streaming responses and history controls."""
     st.subheader("💬 Chat with Video")
+
+    video_id = st.session_state.get("video_id", "")
 
     # Quick question prompt chips
     st.caption("Suggested Questions:")
@@ -26,7 +29,7 @@ def render_chat_ui():
         with st.chat_message("user", avatar="👤"):
             st.markdown(turn["user"])
         with st.chat_message("assistant", avatar="🤖"):
-            st.markdown(turn["ai"])
+            st.markdown(linkify_timestamps(turn["ai"], video_id))
 
         if total_turns > MEMORY_WINDOW and idx < total_turns - MEMORY_WINDOW:
             st.caption("⚠️ Outside active memory window.")
@@ -97,7 +100,8 @@ def render_chat_ui():
 
                 # Final token output without cursor
                 if full_response:
-                    response_box.markdown(full_response)
+                    formatted_final = linkify_timestamps(full_response, video_id)
+                    response_box.markdown(formatted_final)
                     status_box.empty()
 
                     # Save turn

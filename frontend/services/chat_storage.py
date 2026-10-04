@@ -1,10 +1,12 @@
 import time
+import uuid
 import streamlit as st
 
 
 def create_new_chat():
-    """Create a new chat session."""
-    chat_id = f"chat_{int(time.time() * 1000)}"
+    """Create a new chat session with a globally unique ID."""
+    unique_suffix = uuid.uuid4().hex[:8]
+    chat_id = f"chat_{int(time.time())}_{unique_suffix}"
     if "all_chats" not in st.session_state:
         st.session_state.all_chats = {}
 
@@ -15,6 +17,7 @@ def create_new_chat():
     }
     st.session_state.current_chat_id = chat_id
     st.session_state.chat_history = []
+
 
 
 def switch_chat(chat_id: str):

@@ -47,15 +47,48 @@ async def lifespan(app: FastAPI):
             except Exception as e:
                 logger.warning(f"Error during periodic memory cleanup: {e}")
 
+    # Periodic background task to ping public URL every 24 hours to prevent Space from sleeping
+    async def keep_alive_heartbeat():
+        import urllib.request
+        public_space_url = os.environ.get(
+            "SPACE_HOST",
+            os.environ.get("SPACE_URL", "https://aryan2301-youtube-rag-intelligence.hf.space")
+        )
+        if not public_space_url.startswith("http"):
+            public_space_url = f"https://{public_space_url}"
+
+        while not stop_event.is_set():
+            try:
+                # Wait 24 hours (86,400 seconds) between pings
+                await asyncio.wait_for(stop_event.wait(), timeout=86400)
+                break
+            except asyncio.TimeoutError:
+                pass
+            except asyncio.CancelledError:
+                break
+
+            try:
+                ping_url = f"{public_space_url.rstrip('/')}/health"
+                req = urllib.request.Request(
+                    ping_url,
+                    headers={"User-Agent": "HuggingFace-KeepAlive/1.0"}
+                )
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    logger.info(f"24-Hour Keep-Alive ping sent to {ping_url} (HTTP {resp.status}). Inactivity timer reset.")
+            except Exception as e:
+                logger.debug(f"Keep-alive ping attempt: {e}")
+
     cleanup_task = asyncio.create_task(periodic_cleanup())
+    heartbeat_task = asyncio.create_task(keep_alive_heartbeat())
     try:
         yield
     finally:
         stop_event.set()
         cleanup_task.cancel()
+        heartbeat_task.cancel()
         try:
-            await cleanup_task
-        except (asyncio.CancelledError, Exception):
+            await asyncio.gather(cleanup_task, heartbeat_task, return_exceptions=True)
+        except Exception:
             pass
         app.state.video_stores.clear()
 
@@ -96,6 +129,22 @@ class SummaryRequest(BaseModel):
 
 
 # ── Endpoints ────────────────────────────────────────────────────────────────
+
+@app.get("/keep-alive")
+@app.get("/api/keep-alive")
+@app.get("/ping")
+def keep_alive():
+    """Heartbeat endpoint to keep Hugging Face Space awake and prevent 48-hour sleep."""
+    import time
+    now_str = time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime())
+    logger.info(f"Keep-alive heartbeat received at {now_str}.")
+    return {
+        "status": "alive",
+        "timestamp": now_str,
+        "service": "YouTube RAG Intelligence",
+        "message": "Space is awake and active."
+    }
+
 
 @app.get("/health")
 @app.get("/api/health")

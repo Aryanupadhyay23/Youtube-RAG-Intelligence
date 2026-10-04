@@ -1,0 +1,32 @@
+name: Keep Hugging Face Space Alive
+
+on:
+  schedule:
+    # Runs every 24 hours at midnight UTC (well within the 48-hour inactivity sleep window)
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: keep-alive-ping
+  cancel-in-progress: true
+
+jobs:
+  ping-space:
+    name: 💓 Ping Hugging Face Space
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Keep-Alive Heartbeat Ping
+        run: |
+          SPACE_URL="https://aryan2301-youtube-rag-intelligence.hf.space"
+          REPO_URL="https://huggingface.co/spaces/Aryan2301/YouTube_RAG_Intelligence"
+
+          echo "📡 Sending 24-hour keep-alive ping to Hugging Face Space: $SPACE_URL..."
+          
+          # 1. Ping the /keep-alive backend endpoint
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -L "$SPACE_URL/keep-alive" || echo "failed")
+          echo "Endpoint response status: $HTTP_STATUS"
+
+          # 2. Ping the public Space webpage
+          curl -s -L -f -o /dev/null "$REPO_URL" || true
+          
+          echo "✅ Keep-alive ping completed. 48-hour inactivity timer has been successfully reset."

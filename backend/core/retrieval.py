@@ -24,13 +24,12 @@ async def hybrid_retrieve(
     if bm25_retriever is None:
         return (await semantic_retriever.ainvoke(query))[:final_k]
 
-    bm25_retriever.k = bm25_k
-
-    # Execute BM25 and Chroma semantic search in parallel
-    bm25_docs, semantic_docs = await asyncio.gather(
+    # Execute BM25 and Chroma semantic search in parallel without mutating shared state
+    bm25_raw, semantic_docs = await asyncio.gather(
         bm25_retriever.ainvoke(query),
         semantic_retriever.ainvoke(query),
     )
+    bm25_docs = bm25_raw[:bm25_k]
 
     # Reciprocal Rank Fusion (RRF) with content deduplication
     doc_scores = defaultdict(float)

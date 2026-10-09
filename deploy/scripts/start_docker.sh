@@ -1,11 +1,11 @@
 #!/bin/bash
 set -e
 
-AWS_REGION="us-east-1"
+AWS_REGION="ap-southeast-2"
 ECR_REPOSITORY="youtube-rag-intelligence"
 
 # Fetch Account ID dynamically via AWS STS or instance metadata
-AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+AWS_ACCOUNT_ID=$(aws sts get-caller-identity --region ${AWS_REGION} --query Account --output text)
 ECR_REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
 IMAGE_URI="${ECR_REGISTRY}/${ECR_REPOSITORY}:latest"
 
@@ -17,10 +17,12 @@ docker pull ${IMAGE_URI}
 
 echo "Starting container..."
 # Run container mapping port 80 (standard HTTP) to Streamlit (7860) and port 8000 for FastAPI
-# If an /home/ubuntu/.env exists, mount or inject it
+# If an .env exists in /home/ubuntu or /home/ubuntu/app, mount or inject it
 ENV_FLAG=""
 if [ -f "/home/ubuntu/.env" ]; then
     ENV_FLAG="--env-file /home/ubuntu/.env"
+elif [ -f "/home/ubuntu/app/.env" ]; then
+    ENV_FLAG="--env-file /home/ubuntu/app/.env"
 fi
 
 docker run -d \
@@ -31,4 +33,7 @@ docker run -d \
     $ENV_FLAG \
     ${IMAGE_URI}
 
-echo "YouTube RAG Intelligence started successfully."
+# Ensure restart policy is explicitly set so container starts automatically on EC2 reboot
+docker update --restart unless-stopped youtube-rag-container
+
+echo "YouTube RAG Intelligence started successfully with automatic restart policy."

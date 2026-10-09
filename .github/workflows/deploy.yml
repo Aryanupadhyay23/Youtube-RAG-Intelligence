@@ -12,11 +12,6 @@ on:
         type: boolean
         required: true
         default: true
-      enable_huggingface:
-        description: "Deploy to Hugging Face Spaces?"
-        type: boolean
-        required: true
-        default: true
       enable_aws:
         description: "Deploy to AWS (ECR/S3/CodeDeploy)?"
         type: boolean
@@ -35,17 +30,15 @@ env:
   # ─── 🔒 MASTER CI/CD PERMISSION ───────────────────────────────────────────
   # Set to "true" ONLY when you want GitHub Actions to run CI and deploy.
   # Set to "false" to pause/block automatic execution on git push.
-  EXECUTE_PIPELINE: "false"
+  EXECUTE_PIPELINE: "true"
 
   # ─── 🚀 PLATFORM TOGGLES ──────────────────────────────────────────────────
-  ENABLE_HUGGINGFACE: "true"
   ENABLE_AWS: "true"
 
   # ─── CLOUD CONFIGURATION ──────────────────────────────────────────────────
-  HF_SPACE: Aryan2301/YouTube_RAG_Intelligence
-  AWS_REGION: us-east-1
+  AWS_REGION: ap-southeast-2
   ECR_REPOSITORY: youtube-rag-intelligence
-  S3_DEPLOYMENT_BUCKET: youtube-rag-intelligence-deployment
+  S3_DEPLOYMENT_BUCKET: youtube-rag-intelligence
   CODEDEPLOY_APPLICATION_NAME: youtube-rag-intelligence-app
   CODEDEPLOY_DEPLOYMENT_GROUP: youtube-rag-intelligence-group
 
@@ -59,7 +52,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       authorized: ${{ steps.gatekeeper.outputs.authorized }}
-      deploy_hf: ${{ steps.gatekeeper.outputs.deploy_hf }}
       deploy_aws: ${{ steps.gatekeeper.outputs.deploy_aws }}
     steps:
       - name: Evaluate Permission
@@ -73,13 +65,6 @@ jobs:
             echo "authorized=false" >> $GITHUB_OUTPUT
             echo "🛑 Pipeline execution BLOCKED (EXECUTE_PIPELINE is '${{ env.EXECUTE_PIPELINE }}')."
             echo "ℹ️ Set EXECUTE_PIPELINE: 'true' in deploy.yml to enable."
-          fi
-
-          # Evaluate Hugging Face target
-          if [ "${{ env.ENABLE_HUGGINGFACE }}" = "true" ] && [ "${{ inputs.enable_huggingface }}" != "false" ]; then
-            echo "deploy_hf=true" >> $GITHUB_OUTPUT
-          else
-            echo "deploy_hf=false" >> $GITHUB_OUTPUT
           fi
 
           # Evaluate AWS target
@@ -148,38 +133,7 @@ jobs:
 
 
   # ───────────────────────────────────────────────────────────────────────────
-  # 2. CD: Sync & Deploy to Hugging Face Spaces
-  # ───────────────────────────────────────────────────────────────────────────
-  deploy-huggingface:
-    name: CD - Deploy to Hugging Face
-    needs: [verify-permission, ci]
-    if: needs.verify-permission.outputs.authorized == 'true' && needs.verify-permission.outputs.deploy_hf == 'true'
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          lfs: true
-
-      - name: Deploy to Hugging Face Space
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: |
-          if [ -z "$HF_TOKEN" ]; then
-            echo "⚠️ HF_TOKEN secret not found. Skipping Hugging Face sync."
-            exit 0
-          fi
-          git config --global user.email "actions@github.com"
-          git config --global user.name "GitHub Actions"
-          git remote add space "https://Aryan2301:$HF_TOKEN@huggingface.co/spaces/${{ env.HF_SPACE }}"
-          git push --force space HEAD:main
-          echo "🚀 Successfully synced repository to Hugging Face Space: ${{ env.HF_SPACE }}"
-
-
-  # ───────────────────────────────────────────────────────────────────────────
-  # 3. CD: Build Container, Push to ECR & Deploy to AWS EC2
+  # 2. CD: Build Container, Push to ECR & Deploy to AWS EC2
   # ───────────────────────────────────────────────────────────────────────────
   deploy-aws:
     name: CD - Deploy to AWS (ECR & EC2)
@@ -247,6 +201,7 @@ jobs:
 
       - name: Package CodeDeploy Bundle
         run: |
+          chmod +x deploy/scripts/*.sh
           zip -r deployment.zip \
             appspec.yml \
             deploy/scripts/install_dependencies.sh \

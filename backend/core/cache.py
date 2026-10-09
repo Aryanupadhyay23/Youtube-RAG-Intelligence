@@ -29,6 +29,19 @@ class EphemeralVideoStoreCache:
         self.ttl_seconds = max(60, ttl_minutes * 60)
         self._memory_cache: OrderedDict[str, Dict[str, Any]] = OrderedDict()
         self._access_times: Dict[str, float] = {}
+        self._in_flight: Dict[str, int] = {}
+
+    def acquire(self, video_id: str):
+        """Mark video store as actively processing a query to protect it from eviction."""
+        self._in_flight[video_id] = self._in_flight.get(video_id, 0) + 1
+        self._access_times[video_id] = time.time()
+
+    def release(self, video_id: str):
+        """Release active processing lock on a video store."""
+        if video_id in self._in_flight:
+            self._in_flight[video_id] = max(0, self._in_flight[video_id] - 1)
+            if self._in_flight[video_id] == 0:
+                del self._in_flight[video_id]
 
     def get(self, video_id: str) -> Optional[Dict[str, Any]]:
         """Retrieve active video store from in-memory cache and refresh access time."""
@@ -44,7 +57,7 @@ class EphemeralVideoStoreCache:
     def put(self, video_id: str, store_entry: Dict[str, Any]):
         """
         Store video in ephemeral memory.
-        If limit is reached, evict and destroy the oldest Chroma collection immediately.
+        If limit is reached, evict the oldest idle Chroma collection.
         """
         # Clean up any expired videos first
         self.cleanup_expired()
@@ -55,12 +68,20 @@ class EphemeralVideoStoreCache:
             self._access_times[video_id] = time.time()
             return
 
-        # Evict oldest video if capacity reached
+        # Evict oldest idle video if capacity reached (never evict one with in-flight requests)
         while len(self._memory_cache) >= self.max_active_videos:
-            evicted_id, _ = self._memory_cache.popitem(last=False)
-            self._access_times.pop(evicted_id, None)
-            logger.info(f"Capacity limit reached. Evicting older video '{evicted_id}' from RAM.")
-            delete_video_collection(evicted_id)
+            candidate_id = None
+            for vid in self._memory_cache:
+                if self._in_flight.get(vid, 0) == 0:
+                    candidate_id = vid
+                    break
+            if candidate_id is None:
+                # All active videos currently handling requests; allow temporary burst
+                break
+            del self._memory_cache[candidate_id]
+            self._access_times.pop(candidate_id, None)
+            logger.info(f"Capacity limit reached. Evicting idle video '{candidate_id}' from RAM.")
+            delete_video_collection(candidate_id)
 
         self._memory_cache[video_id] = store_entry
         self._access_times[video_id] = time.time()
@@ -70,11 +91,11 @@ class EphemeralVideoStoreCache:
         )
 
     def cleanup_expired(self) -> int:
-        """Scan and delete all video collections that exceeded inactivity TTL."""
+        """Scan and delete all idle video collections that exceeded inactivity TTL."""
         now = time.time()
         expired_ids = [
             vid for vid, last_t in self._access_times.items()
-            if (now - last_t) > self.ttl_seconds
+            if (now - last_t) > self.ttl_seconds and self._in_flight.get(vid, 0) == 0
         ]
 
         for vid in expired_ids:

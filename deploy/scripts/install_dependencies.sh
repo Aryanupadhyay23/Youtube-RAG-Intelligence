@@ -11,6 +11,10 @@ if ! command -v docker &> /dev/null; then
     usermod -aG docker ubuntu
 fi
 
+# Ensure docker daemon always starts on system boot
+systemctl enable docker
+systemctl start docker
+
 # Install AWS CLI v2 if not present
 if ! command -v aws &> /dev/null; then
     echo "Installing AWS CLI..."

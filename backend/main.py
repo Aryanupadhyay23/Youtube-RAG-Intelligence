@@ -1,14 +1,17 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import StreamingResponse
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import List, Dict, Any
+import os
 import re
 import json
 import asyncio
 import logging
 from contextlib import asynccontextmanager
+from typing import List, Dict, Any
 
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import StreamingResponse
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+
+from backend.core.llm import load_llm
 from backend.core.graph import build_langgraph
 from backend.core.vectorstore import build_retrievers
 from backend.core.summary import generate_summary, generate_summary_async, generate_summary_stream
@@ -67,7 +70,7 @@ async def lifespan(app: FastAPI):
                 break
 
             try:
-                ping_url = f"{public_space_url.rstrip('/')}/health"
+                ping_url = f"{public_space_url.rstrip('/')}/_stcore/health"
                 req = urllib.request.Request(
                     ping_url,
                     headers={"User-Agent": "HuggingFace-KeepAlive/1.0"}
@@ -256,11 +259,12 @@ async def chat_stream(req: ChatRequest):
             "thread_id": thread_id,
             "vector_store": stores["vector_store"],
             "bm25_retriever": stores["bm25_retriever"],
-            "llm": __import__("backend.core.llm", fromlist=["load_llm"]).load_llm(),
+            "llm": load_llm(),
         }
     }
 
     async def event_generator():
+        app.state.video_stores.acquire(req.video_id)
         try:
             async for event in app.state.rag_graph.astream_events(inputs, config=config, version="v1"):
                 kind = event["event"]
@@ -288,6 +292,8 @@ async def chat_stream(req: ChatRequest):
         except Exception as e:
             logger.error(f"Streaming error: {e}")
             yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
+        finally:
+            app.state.video_stores.release(req.video_id)
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 

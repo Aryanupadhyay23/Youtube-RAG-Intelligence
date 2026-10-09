@@ -19,3 +19,4 @@ instructions.txt
 .cache/
 data/
 logs/
+.venv/

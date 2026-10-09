@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 from frontend.utils.youtube import extract_video_id
 from frontend.utils.session import reset_video_state
-from frontend.services.api_client import initialize_video
+from frontend.services.api_client import initialize_video, API_BASE_URL
 
 
 def render_landing_page():
@@ -72,7 +72,7 @@ from any video's verbatim transcript.
                             st.rerun()
 
                     except requests.exceptions.ConnectionError:
-                        st.error("🔌 Cannot reach backend at http://127.0.0.1:8000. Please ensure the backend is running.")
+                        st.error(f"🔌 Cannot reach backend at {API_BASE_URL}. Please ensure the backend is running.")
                     except Exception as error:
                         error_str = str(error)
                         st.error(f"❌ Failed to load video: {error_str}")

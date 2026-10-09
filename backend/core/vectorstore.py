@@ -54,7 +54,8 @@ def build_retrievers(video_id: str, transcript_segments: list):
     )
 
     try:
-        bm25_retriever = BM25Retriever.from_documents(documents)
+        from backend.utils.constants import BM25_TOP_K
+        bm25_retriever = BM25Retriever.from_documents(documents, k=BM25_TOP_K)
     except Exception as e:
         logger.warning(f"BM25 initialization failed: {e}")
         bm25_retriever = None

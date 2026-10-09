@@ -1,4 +1,6 @@
 #!/bin/bash
 echo "Stopping existing YouTube RAG container if running..."
-docker stop youtube-rag-container || true
-docker rm youtube-rag-container || true
+if command -v docker &> /dev/null; then
+    docker stop youtube-rag-container 2>/dev/null || true
+    docker rm youtube-rag-container 2>/dev/null || true
+fi

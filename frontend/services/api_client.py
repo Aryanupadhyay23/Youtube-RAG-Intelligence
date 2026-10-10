@@ -31,7 +31,12 @@ def initialize_video(
         "transcript_segments": transcript_segments or [],
     }
     r = requests.post(f"{API_BASE_URL}/init", json=payload, timeout=180)
-    r.raise_for_status()
+    if r.status_code != 200:
+        try:
+            detail = r.json().get("detail", r.text)
+        except Exception:
+            detail = r.text
+        raise RuntimeError(detail)
     return r.json()
 
 

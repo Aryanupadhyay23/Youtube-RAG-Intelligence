@@ -34,12 +34,15 @@ def render_chat_ui():
         if total_turns > MEMORY_WINDOW and idx < total_turns - MEMORY_WINDOW:
             st.caption("⚠️ Outside active memory window.")
 
-    # Chat Input Box
+    # Chat Input Box - Always render st.chat_input on every run so it never unmounts
+    chat_input = st.chat_input("Ask about this video…")
+
+    user_question = None
     if st.session_state.get("pending_question"):
         user_question = st.session_state.pending_question
         st.session_state.pending_question = None
-    else:
-        user_question = st.chat_input("Ask about this video…")
+    elif chat_input:
+        user_question = chat_input
 
     if user_question:
         with st.chat_message("user", avatar="👤"):
@@ -127,9 +130,11 @@ def render_chat_ui():
                     response_box.markdown(formatted_final)
                     status_box.empty()
 
-                    # Save turn
+                    # Save turn and cleanly refresh UI for next question
                     chat_history.append({"user": user_question, "ai": full_response})
+                    st.session_state.chat_history = chat_history
                     save_current_chat(chat_history)
+                    st.rerun()
 
                 elif not has_error:
                     response_box.markdown("*No response was generated. Please try again.*")

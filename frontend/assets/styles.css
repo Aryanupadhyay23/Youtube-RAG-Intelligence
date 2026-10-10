@@ -22,7 +22,7 @@ html, body, [class*="css"] {
 
 .block-container {
     padding-top: 1.5rem !important;
-    padding-bottom: 3rem !important;
+    padding-bottom: 7rem !important;
     max-width: 1100px !important;
     margin-left: auto !important;
     margin-right: auto !important;
@@ -277,4 +277,107 @@ hr {
 }
 .animate-status-pulse {
     animation: tw-pulse 2s ease-in-out infinite;
+}
+
+/* ───────────────────────────────────────────────────────────
+ * Mobile & Touch Device Responsive Enhancements (< 768px)
+ * ─────────────────────────────────────────────────────────── */
+@media screen and (max-width: 768px) {
+    /* 1. Maximize usable screen width on mobile */
+    .block-container {
+        padding-top: 1rem !important;
+        padding-bottom: 7.5rem !important;
+        padding-left: 0.75rem !important;
+        padding-right: 0.75rem !important;
+        max-width: 100% !important;
+    }
+
+    /* 2. Touch-friendly tab navigation (horizontal swipe, no awkward line breaking) */
+    .stTabs [data-baseweb="tab-list"] {
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        gap: 6px !important;
+        scrollbar-width: none !important;
+        margin-bottom: 0.85rem !important;
+    }
+    .stTabs [data-baseweb="tab-list"]::-webkit-scrollbar {
+        display: none !important;
+    }
+    .stTabs [data-baseweb="tab"] {
+        padding: 8px 14px !important;
+        font-size: 0.82rem !important;
+        white-space: nowrap !important;
+        flex-shrink: 0 !important;
+        border-radius: 8px 8px 0 0 !important;
+    }
+
+    /* 3. Compact, readable chat bubbles on small mobile viewports */
+    [data-testid="stChatMessage"], .stChatMessage {
+        padding: 0.85rem 0.95rem !important;
+        border-radius: 14px !important;
+        margin-bottom: 0.65rem !important;
+    }
+    [data-testid="stChatMessage"] p, .stChatMessage p {
+        font-size: 0.88rem !important;
+        line-height: 1.55 !important;
+    }
+
+    /* 4. Chat input ergonomics for mobile keyboards */
+    [data-testid="stChatInput"] {
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
+        padding-bottom: 0.5rem !important;
+    }
+    [data-testid="stChatInput"] > div {
+        border-radius: 12px !important;
+    }
+    [data-testid="stChatInput"] textarea {
+        font-size: 0.92rem !important;
+        padding: 8px 10px !important;
+    }
+
+    /* 5. Touch-friendly buttons (minimum 42px touch targets) */
+    .stButton button, .stDownloadButton button, .stLinkButton a {
+        min-height: 42px !important;
+        font-size: 0.85rem !important;
+        padding: 0.5rem 0.75rem !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+
+    /* 6. Mobile form adjustment (stack input and submit button if needed) */
+    [data-testid="stForm"] {
+        padding: 0.85rem 1rem !important;
+        border-radius: 12px !important;
+    }
+
+    /* 7. Ensure videos and images fill mobile screen without horizontal scroll */
+    iframe, video, img {
+        max-width: 100% !important;
+        height: auto !important;
+    }
+
+    /* 8. Make suggested questions chips wrap cleanly on small screens */
+    .stButton button[key^="quick_"] {
+        white-space: normal !important;
+        height: auto !important;
+        text-align: center !important;
+        line-height: 1.25 !important;
+    }
+
+    /* 9. Header & Typography scale down for mobile viewports */
+    h1 {
+        font-size: 1.75rem !important;
+        line-height: 1.2 !important;
+    }
+    h2 {
+        font-size: 1.4rem !important;
+        line-height: 1.25 !important;
+    }
+    h3 {
+        font-size: 1.15rem !important;
+    }
 }

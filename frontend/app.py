@@ -26,7 +26,7 @@ st.set_page_config(
     page_title=APP_TITLE,
     page_icon="▶️",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="auto",
 )
 
 
@@ -81,8 +81,8 @@ if st.session_state.get("video_id") and st.session_state.get("transcript_text"):
     author = metadata.get("author", "Unknown Channel")
     thumb_url = metadata.get("thumbnail") or f"https://img.youtube.com/vi/{vid_id}/hqdefault.jpg"
 
-    card_html = f"""<div class="flex flex-col md:flex-row items-center gap-5 p-5 rounded-2xl bg-slate-900/80 border border-blue-500/20 backdrop-blur-xl shadow-xl shadow-blue-950/30 mb-6 transition-all duration-300 hover:border-blue-500/40">
-<div class="w-full md:w-56 h-32 flex-shrink-0 overflow-hidden rounded-xl border border-blue-500/25 shadow-md bg-black">
+    card_html = f"""<div class="flex flex-col md:flex-row items-start md:items-center gap-4 md:gap-5 p-4 md:p-5 rounded-2xl bg-slate-900/80 border border-blue-500/20 backdrop-blur-xl shadow-xl shadow-blue-950/30 mb-6 transition-all duration-300 hover:border-blue-500/40">
+<div class="w-full md:w-56 aspect-video md:h-32 flex-shrink-0 overflow-hidden rounded-xl border border-blue-500/25 shadow-md bg-black">
 <img src="{thumb_url}" class="w-full h-full object-cover" alt="Video Thumbnail" />
 </div>
 <div class="flex-1 min-w-0">

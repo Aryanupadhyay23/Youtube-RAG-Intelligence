@@ -17,50 +17,6 @@ def check_api_health() -> bool:
         return False
 
 
-def fetch_log_dates() -> List[str]:
-    """Retrieve list of dates for which log files exist."""
-    try:
-        r = requests.get(f"{API_BASE_URL}/api/logs/dates", timeout=3)
-        if r.status_code == 200:
-            return r.json().get("dates", [])
-    except Exception:
-        pass
-    # Local fallback
-    try:
-        from backend.utils.logger import get_available_log_dates
-        return get_available_log_dates()
-    except Exception:
-        return []
-
-
-def fetch_markdown_logs(date_str: str = "", level_filter: str = "", search_query: str = "") -> str:
-    """Fetch logs formatted directly in Markdown with local fallback."""
-    params = {}
-    if date_str:
-        params["date"] = date_str
-    if level_filter:
-        params["level"] = level_filter
-    if search_query:
-        params["query"] = search_query
-
-    try:
-        r = requests.get(f"{API_BASE_URL}/api/logs", params=params, timeout=5)
-        if r.status_code == 200:
-            return r.json().get("markdown", "")
-    except Exception:
-        pass
-
-    # Local fallback
-    try:
-        from backend.utils.logger import get_datewise_logs_markdown
-        return get_datewise_logs_markdown(
-            date_str=date_str or None,
-            level_filter=level_filter or None,
-            search_query=search_query,
-        )
-    except Exception as e:
-        return f"⚠️ Unable to retrieve logs: {e}"
-
 
 
 def initialize_video(

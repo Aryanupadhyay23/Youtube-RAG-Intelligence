@@ -30,6 +30,8 @@ if [ -n "$ENV_FILE" ]; then
     # Strip carriage returns and remove any spaces around '=' to satisfy Docker's strict env parser
     sed -i 's/\r$//' "$ENV_FILE"
     sed -i 's/[[:space:]]*=[[:space:]]*/=/' "$ENV_FILE"
+    # Strip enclosing quotes around values because Docker preserves literal quotes
+    sed -i -E 's/="?([^"]*)"?$/=\1/' "$ENV_FILE"
     ENV_FLAG="--env-file $ENV_FILE"
 fi
 

@@ -27,13 +27,13 @@ permissions:
   contents: write
 
 env:
-  # ─── 🔒 MASTER CI/CD PERMISSION ───────────────────────────────────────────
+  # ─── MASTER CI/CD PERMISSION ─────────────────────────────────────────────
   # Set to "true" ONLY when you want GitHub Actions to run CI and deploy.
   # Set to "false" to pause/block automatic execution on git push.
-  EXECUTE_PIPELINE: "true"
+  EXECUTE_PIPELINE: "false"
 
-  # ─── 🚀 PLATFORM TOGGLES ──────────────────────────────────────────────────
-  ENABLE_AWS: "true"
+  # ─── PLATFORM TOGGLES ────────────────────────────────────────────────────
+  ENABLE_AWS: "false"
 
   # ─── CLOUD CONFIGURATION ──────────────────────────────────────────────────
   AWS_REGION: ap-southeast-2
@@ -44,11 +44,9 @@ env:
 
 
 jobs:
-  # ───────────────────────────────────────────────────────────────────────────
   # 0. Gatekeeper: Verify Execution Permission & Platform Targets
-  # ───────────────────────────────────────────────────────────────────────────
   verify-permission:
-    name: 🔒 Verify Execution Permission
+    name: Verify Execution Permission
     runs-on: ubuntu-latest
     outputs:
       authorized: ${{ steps.gatekeeper.outputs.authorized }}
@@ -60,11 +58,11 @@ jobs:
           # Evaluate master pipeline permission
           if [ "${{ env.EXECUTE_PIPELINE }}" = "true" ] || [ "${{ inputs.execute_pipeline }}" = "true" ]; then
             echo "authorized=true" >> $GITHUB_OUTPUT
-            echo "✅ Pipeline execution AUTHORIZED."
+            echo "Pipeline execution AUTHORIZED."
           else
             echo "authorized=false" >> $GITHUB_OUTPUT
-            echo "🛑 Pipeline execution BLOCKED (EXECUTE_PIPELINE is '${{ env.EXECUTE_PIPELINE }}')."
-            echo "ℹ️ Set EXECUTE_PIPELINE: 'true' in deploy.yml to enable."
+            echo "Pipeline execution BLOCKED (EXECUTE_PIPELINE is '${{ env.EXECUTE_PIPELINE }}')."
+            echo "Set EXECUTE_PIPELINE: 'true' in deploy.yml to enable."
           fi
 
           # Evaluate AWS target
@@ -75,9 +73,7 @@ jobs:
           fi
 
 
-  # ───────────────────────────────────────────────────────────────────────────
   # 1. CI: Code Quality, Linting & Smoke Tests
-  # ───────────────────────────────────────────────────────────────────────────
   ci:
     name: CI - Code Validation & Smoke Tests
     needs: verify-permission
@@ -115,7 +111,7 @@ jobs:
                   if f.endswith('.py'):
                       py_compile.compile(os.path.join(root, f), doraise=True)
                       count += 1
-          print(f'✅ Successfully compiled {count} Python files with zero syntax errors.')
+          print(f'Successfully compiled {count} Python files with zero syntax errors.')
           "
 
       - name: Run Core Module Smoke Test
@@ -128,13 +124,11 @@ jobs:
           assert parse_timestamp_seconds('01:05') == 65
           graph = build_langgraph()
           assert graph is not None
-          print('✅ Core RAG & LangGraph smoke test passed.')
+          print('Core RAG & LangGraph smoke test passed.')
           "
 
 
-  # ───────────────────────────────────────────────────────────────────────────
   # 2. CD: Build Container, Push to ECR & Deploy to AWS EC2
-  # ───────────────────────────────────────────────────────────────────────────
   deploy-aws:
     name: CD - Deploy to AWS (ECR & EC2)
     needs: [verify-permission, ci]
@@ -179,7 +173,7 @@ jobs:
           for i in {1..15}; do
             sleep 2
             if curl -sf http://localhost:8000/health | grep healthy; then
-              echo "✅ FastAPI container passed pre-deployment health check!"
+              echo "FastAPI container passed pre-deployment health check!"
               break
             fi
           done
@@ -197,7 +191,7 @@ jobs:
 
           docker push $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
           docker push $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:latest
-          echo "📦 Pushed image tags to ECR: ${{ github.sha }} and latest"
+          echo "Pushed image tags to ECR: ${{ github.sha }} and latest"
 
       - name: Package CodeDeploy Bundle
         run: |
@@ -223,4 +217,4 @@ jobs:
             --region ${{ env.AWS_REGION }} \
             --query "deploymentId" \
             --output text)
-          echo "🚀 AWS CodeDeploy deployment triggered successfully! Deployment ID: $DEPLOYMENT_ID"
+          echo "AWS CodeDeploy deployment triggered successfully! Deployment ID: $DEPLOYMENT_ID"

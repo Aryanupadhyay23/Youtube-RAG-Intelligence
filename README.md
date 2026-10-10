@@ -15,7 +15,8 @@ An AI-powered YouTube video assistant built with LangGraph, LangChain, openai/gp
 
 ## Live Demo
 
-[YouTube RAG Intelligence on HuggingFace](https://huggingface.co/spaces/Aryan2301/YouTube_RAG_Intelligence)
+- **HuggingFace Space**: [YouTube RAG Intelligence on HuggingFace](https://huggingface.co/spaces/Aryan2301/YouTube_RAG_Intelligence)
+- **AWS EC2 Deployment**: [http://32.236.58.120:80/](http://32.236.58.120:80/) *(Active Monday to Friday, 9:00 AM to 5:00 PM)*
 
 ---
 
@@ -27,6 +28,71 @@ An AI-powered YouTube video assistant built with LangGraph, LangChain, openai/gp
 - **Multi-language** - Transcripts in any language; responses always in English
 - **Multi-chat** - Create, switch, and delete multiple chat sessions
 - **Export** - Download chat history and summaries as `.txt` or `.md`
+
+---
+
+## Agent Architecture & Workflow
+
+The assistant employs a **LangGraph-driven Corrective RAG (CRAG)** loop with hybrid retrieval (Dense Semantic + Sparse Lexical), LLM grading, adaptive query correction, and web search fallback:
+
+```mermaid
+flowchart TD
+    %% Entry & End
+    START([● START: User Query + History]) --> N1
+    N6 --> END([● END: Streamed Response])
+
+    %% Main Graph Nodes
+    subgraph LangGraph ["LangGraph Corrective RAG (CRAG) Workflow"]
+        
+        %% Node 1
+        N1["1. rewrite_query<br/><b>LLM: Rewrite Prompt</b><br/><i>Resolves context into standalone query</i>"]
+        
+        %% Node 2
+        N2["2. hybrid_retrieve<br/><b>Concurrent Hybrid Retrieval</b><br/><i>ChromaDB (Dense) + BM25 (Sparse) ➔ RRF Fusion</i>"]
+        
+        %% Node 3
+        N3["3. evaluate_retrieval<br/><b>LLM: Grader Prompt</b><br/><i>Evaluates relevance of top chunks (GOOD / POOR)</i>"]
+        
+        %% Conditional Router
+        ROUTE{"Conditional Router<br/><b>route_after_evaluation</b>"}
+        
+        %% Node 4 (Correction Loop)
+        N4["4. correct_query<br/><b>LLM: Corrective Prompt</b><br/><i>Refines search terms & increments attempt</i>"]
+        
+        %% Node 5 (Fallback Tool)
+        N5["5. web_search<br/><b>Tavily Search Tool</b><br/><i>External web search as supplementary context</i>"]
+        
+        %% Node 6 (Answer Generator)
+        N6["6. generate_answer<br/><b>LLM: Answer Prompt</b><br/><i>Grounded response with timestamp citations</i>"]
+
+        %% Graph Edges
+        N1 --> N2
+        N2 --> N3
+        N3 --> ROUTE
+
+        %% Conditional Branches
+        ROUTE -->|"Score: GOOD"| N6
+        ROUTE -->|"Score: POOR (Attempt < 2)"| N4
+        ROUTE -->|"Score: POOR (Max Attempts Reached)"| N5
+
+        %% Loop back and fallthrough
+        N4 -->|"Re-attempt Hybrid Search"| N2
+        N5 -->|"Context + Web Results"| N6
+    end
+
+    %% Node Styling
+    classDef terminal fill:#1e293b,stroke:#0f172a,color:#ffffff,font-weight:bold,stroke-width:2px;
+    classDef llmNode fill:#4f46e5,stroke:#3730a3,color:#ffffff,stroke-width:2px;
+    classDef retrieveNode fill:#059669,stroke:#047857,color:#ffffff,stroke-width:2px;
+    classDef routerNode fill:#d97706,stroke:#b45309,color:#ffffff,stroke-width:2px;
+    classDef toolNode fill:#0284c7,stroke:#0369a1,color:#ffffff,stroke-width:2px;
+
+    class START,END terminal;
+    class N1,N3,N4,N6 llmNode;
+    class N2 retrieveNode;
+    class ROUTE routerNode;
+    class N5 toolNode;
+```
 
 ---
 

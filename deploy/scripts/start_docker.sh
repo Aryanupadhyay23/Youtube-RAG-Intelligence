@@ -17,12 +17,20 @@ docker pull ${IMAGE_URI}
 
 echo "Starting container..."
 # Run container mapping port 80 (standard HTTP) to Streamlit (7860) and port 8000 for FastAPI
-# If an .env exists in /home/ubuntu or /home/ubuntu/app, mount or inject it
+# If an .env exists in /home/ubuntu or /home/ubuntu/app, sanitize and inject it
 ENV_FLAG=""
+ENV_FILE=""
 if [ -f "/home/ubuntu/.env" ]; then
-    ENV_FLAG="--env-file /home/ubuntu/.env"
+    ENV_FILE="/home/ubuntu/.env"
 elif [ -f "/home/ubuntu/app/.env" ]; then
-    ENV_FLAG="--env-file /home/ubuntu/app/.env"
+    ENV_FILE="/home/ubuntu/app/.env"
+fi
+
+if [ -n "$ENV_FILE" ]; then
+    # Strip carriage returns and remove any spaces around '=' to satisfy Docker's strict env parser
+    sed -i 's/\r$//' "$ENV_FILE"
+    sed -i 's/[[:space:]]*=[[:space:]]*/=/' "$ENV_FILE"
+    ENV_FLAG="--env-file $ENV_FILE"
 fi
 
 docker run -d \

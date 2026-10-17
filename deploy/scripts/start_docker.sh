@@ -38,7 +38,7 @@ fi
 docker run -d \
     --name youtube-rag-container \
     --restart unless-stopped \
-    -p 80:7860 \
+    -p 7860:7860 \
     -p 8000:8000 \
     $ENV_FLAG \
     ${IMAGE_URI}

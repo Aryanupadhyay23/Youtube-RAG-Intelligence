@@ -119,8 +119,9 @@ async def chat_stream(req: ChatRequest, request: Request):
 
             yield "event: end\ndata: {}\n\n"
         except Exception as e:
-            logger.error(f"Streaming error: {e}")
-            yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
+            logger.error(f"Streaming error: {e}", exc_info=True)
+            err_msg = str(e).strip() if str(e).strip() else f"{e.__class__.__name__}: An error occurred during processing."
+            yield f"event: error\ndata: {json.dumps({'error': err_msg})}\n\n"
         finally:
             app_state.video_stores.release(req.video_id)
 

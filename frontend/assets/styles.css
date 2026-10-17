@@ -131,12 +131,42 @@ html, body, [class*="css"] {
     border-color: rgba(59, 130, 246, 0.18) !important;
 }
 
-/* ─── Streamlit Header & Clutter Removal ─── */
+/* ─── Streamlit Header & Sidebar Controls ─── */
 header[data-testid="stHeader"] {
-    display: none !important;
+    background: transparent !important;
+    color: #94a3b8 !important;
+    height: 3.25rem !important;
+    z-index: 100 !important;
 }
-#MainMenu, footer {
+
+/* Ensure sidebar collapse & expand controls remain visible and touch-friendly on both mobile and desktop */
+[data-testid="stSidebarCollapsedControl"],
+[data-testid="stSidebarCollapseButton"] {
+    visibility: visible !important;
+    display: flex !important;
+    color: #60a5fa !important;
+    z-index: 101 !important;
+}
+
+[data-testid="stSidebarCollapsedControl"] button,
+[data-testid="stSidebarCollapseButton"] button {
+    color: #60a5fa !important;
+    background: rgba(30, 58, 138, 0.45) !important;
+    border: 1px solid rgba(59, 130, 246, 0.3) !important;
+    border-radius: 8px !important;
+    transition: all 0.2s ease !important;
+}
+
+[data-testid="stSidebarCollapsedControl"] button:hover,
+[data-testid="stSidebarCollapseButton"] button:hover {
+    background: rgba(30, 58, 138, 0.75) !important;
+    border-color: #60a5fa !important;
+}
+
+/* Hide clutter: MainMenu, deploy buttons, toolbar, footer, decorations */
+#MainMenu, footer, [data-testid="stToolbar"], [data-testid="stDecoration"], .stDeployButton {
     visibility: hidden !important;
+    display: none !important;
     height: 0 !important;
 }
 
@@ -406,6 +436,29 @@ hr {
         height: auto !important;
     }
 
+
+    /* 8. Mobile Sidebar Toggle Button (always visible and prominent) */
+    [data-testid="stSidebarCollapsedControl"],
+    header [data-testid="stSidebarCollapsedControl"],
+    .stSidebarCollapsedControl {
+        display: flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        position: fixed !important;
+        top: 0.65rem !important;
+        left: 0.75rem !important;
+        z-index: 999999 !important;
+    }
+    [data-testid="stSidebarCollapsedControl"] button {
+        background: rgba(15, 23, 42, 0.85) !important;
+        border: 1px solid rgba(59, 130, 246, 0.45) !important;
+        color: #60a5fa !important;
+        border-radius: 8px !important;
+        padding: 6px 10px !important;
+        min-height: 38px !important;
+        min-width: 38px !important;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45) !important;
+    }
 
     /* 9. Header & Typography scale down for mobile viewports */
     h1 {

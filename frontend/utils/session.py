@@ -21,7 +21,7 @@ SESSION_DEFAULTS = {
     "transcript_segments": None,
     "summary": None,
     "chat_history": [],
-    "current_chat_id": "default_chat",
+    "current_chat_id": None,
     "player_start_time": 0,
     "username": "default",
 }
@@ -46,7 +46,7 @@ def reset_video_state():
     st.session_state.chat_history = []
     st.session_state.submitted_video_url = None
     st.session_state.all_chats = {}
-    st.session_state.current_chat_id = "default_chat"
+    st.session_state.current_chat_id = None
     st.session_state.transcript_display_limit = 60
     st.session_state.player_start_time = 0
     st.session_state._memory_synced_video = None

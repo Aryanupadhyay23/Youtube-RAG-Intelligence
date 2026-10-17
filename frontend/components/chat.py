@@ -90,13 +90,13 @@ def render_chat_ui():
                     elif event_type == "error":
                         status_placeholder.empty()
                         has_error = True
-                        error_val = str(value)
+                        error_val = str(value).strip() if value else "An unexpected error occurred."
                         if "connect" in error_val.lower() or "Connection" in error_val:
                             st.error(f"🔌 Cannot reach the backend at {API_BASE_URL}.")
                         elif "timeout" in error_val.lower():
                             st.error("⏱️ Request timed out. Try again.")
                         else:
-                            st.error(f"❌ {value}")
+                            st.error(f"❌ {error_val}")
 
                 if full_response:
                     formatted_final = linkify_timestamps(full_response, video_id)

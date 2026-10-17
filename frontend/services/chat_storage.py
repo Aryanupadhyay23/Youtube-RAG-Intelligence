@@ -4,7 +4,6 @@ import streamlit as st
 from frontend.services.api import (
     get_remote_chats,
     get_remote_chat_history,
-    create_remote_chat,
     delete_remote_chat,
 )
 
@@ -19,7 +18,7 @@ def get_current_username() -> str:
 
 
 def create_new_chat():
-    """Create a new chat session with a globally unique ID and persist to memory."""
+    """Create a new chat session with a globally unique ID and a clean empty conversation."""
     unique_suffix = uuid.uuid4().hex[:8]
     chat_id = f"chat_{int(time.time())}_{unique_suffix}"
     if "all_chats" not in st.session_state:
@@ -32,16 +31,6 @@ def create_new_chat():
     }
     st.session_state.current_chat_id = chat_id
     st.session_state.chat_history = []
-
-    # Notify backend / Redis
-    video_id = st.session_state.get("video_id")
-    if video_id:
-        create_remote_chat(
-            video_id=video_id,
-            chat_id=chat_id,
-            title="New Chat",
-            username=get_current_username(),
-        )
 
 
 def switch_chat(chat_id: str):
@@ -132,7 +121,7 @@ def switch_user(new_username: str):
     st.session_state._memory_synced_video = None
     st.session_state._memory_synced_user = None
 
-    # Load sessions for the selected user
+    # Load sessions for the selected user into memory for sidebar display
     video_id = st.session_state.get("video_id")
     if video_id:
         remote_sessions = get_remote_chats(video_id, username=cleaned)
@@ -145,13 +134,8 @@ def switch_user(new_username: str):
                         "messages": [],
                         "created_at": s.get("created_at", time.strftime("%H:%M")),
                     }
-            newest_id = remote_sessions[0].get("chat_id")
-            st.session_state.current_chat_id = newest_id
-            switch_chat(newest_id)
-        else:
-            create_new_chat()
-    else:
-        create_new_chat()
+    # Always open a fresh, empty conversation
+    create_new_chat()
 
 
 def get_saved_user_sessions(username: str = "") -> list:
@@ -161,7 +145,9 @@ def get_saved_user_sessions(username: str = "") -> list:
 
 
 def initialize_chat_state():
-    """Ensure chat session state is loaded from Upstash Redis for the active user."""
+    """Ensure chat session state is loaded from Upstash Redis for the active user.
+    Always starts a fresh, new conversation by default unless a past chat was explicitly requested.
+    """
     if "all_chats" not in st.session_state:
         st.session_state.all_chats = {}
 
@@ -184,13 +170,14 @@ def initialize_chat_state():
                         "messages": [],
                         "created_at": s.get("created_at", time.strftime("%H:%M")),
                     }
+            # Only resume if the user explicitly clicked on a specific past chat session
             if target_chat and target_chat in st.session_state.all_chats:
                 chosen_id = target_chat
-            else:
-                chosen_id = remote_sessions[0].get("chat_id")
-            if chosen_id:
                 st.session_state.current_chat_id = chosen_id
                 switch_chat(chosen_id)
+            else:
+                # Fresh, empty conversation for new visitors / video loading
+                create_new_chat()
         else:
             create_new_chat()
 

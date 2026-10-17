@@ -10,7 +10,7 @@ Chat with YouTube videos in natural language, generate structured multi-part exe
 
 ## Live Deployment
 
-- **AWS EC2 Production Deployment**: [http://32.236.58.120:80/](http://32.236.58.120:80/) *(Active Monday to Friday, 9:00 AM to 5:00 PM)*
+- **AWS EC2 Production Deployment**: [http://aryan-projects.duckdns.org:80/](http://aryan-projects.duckdns.org:80/) *(Active Monday to Friday, 9:00 AM to 5:00 PM)*
 
 ---
 

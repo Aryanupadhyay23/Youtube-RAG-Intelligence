@@ -1,4 +1,3 @@
-import os
 import sys
 import re
 import html
@@ -20,7 +19,7 @@ try:
     _test_file.touch()
     _test_file.unlink()
 except (PermissionError, OSError):
-    # Graceful fallback to /tmp/youtube_rag_logs (guaranteed writable on Hugging Face Spaces and Docker)
+    # Graceful fallback to /tmp/youtube_rag_logs (guaranteed writable in Linux/Docker environments)
     LOGS_DIR = Path(tempfile.gettempdir()) / "youtube_rag_logs"
     try:
         LOGS_DIR.mkdir(parents=True, exist_ok=True)

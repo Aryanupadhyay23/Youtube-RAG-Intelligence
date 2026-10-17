@@ -7,14 +7,12 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 import streamlit as st
-import requests
 
-from frontend.utils.constants import APP_TITLE, APP_CAPTION
-from frontend.utils.youtube import extract_video_id
+from frontend.utils.constants import APP_TITLE
 from frontend.utils.session import initialize_session, reset_video_state
 from frontend.utils.timestamp import format_time
 from frontend.services.chat_storage import initialize_chat_state
-from frontend.services.api_client import initialize_video, check_api_health
+from frontend.services.api import check_api_health
 from frontend.components.sidebar import render_sidebar
 from frontend.components.landing import render_landing_page
 from frontend.components.chat import render_chat_ui
@@ -31,26 +29,7 @@ st.set_page_config(
 
 
 def _load_styles():
-    """Inject Tailwind CSS v3 CDN and custom Streamlit widget styles."""
-    tailwind_cdn = """
-    <!-- Tailwind CSS v3 CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css">
-    <script>
-        try {
-            if (window.parent && window.parent.document) {
-                if (!window.parent.document.getElementById('tailwind-cdn')) {
-                    var s = window.parent.document.createElement('script');
-                    s.id = 'tailwind-cdn';
-                    s.src = 'https://cdn.tailwindcss.com';
-                    window.parent.document.head.appendChild(s);
-                }
-            }
-        } catch(e) {}
-    </script>
-    """
-    st.markdown(tailwind_cdn, unsafe_allow_html=True)
-
+    """Inject custom styles for clean typography, dark theme, and glassmorphism."""
     css_path = Path(__file__).resolve().parent / "assets" / "styles.css"
     if css_path.exists():
         st.markdown(f"<style>{css_path.read_text(encoding='utf-8')}</style>", unsafe_allow_html=True)
@@ -73,47 +52,61 @@ if st.session_state.get("video_id") and st.session_state.get("transcript_text"):
     # Backend status badge (compact, inline using Tailwind)
     api_online = check_api_health()
     if api_online:
-        status_html = '<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-950/70 text-emerald-400 border border-emerald-500/30 shadow-sm shadow-emerald-500/10"><span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>Backend Online</span>'
+        status_html = '<span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; background: rgba(6, 78, 59, 0.4); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3);">🟢 Online</span>'
     else:
-        status_html = '<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-950/70 text-rose-400 border border-rose-500/30 shadow-sm shadow-rose-500/10"><span class="w-2 h-2 rounded-full bg-rose-400"></span>Backend Offline</span>'
+        status_html = '<span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; background: rgba(136, 19, 55, 0.4); color: #fb7185; border: 1px solid rgba(244, 63, 94, 0.3);">🔴 Offline</span>'
 
     title = metadata.get("title", "YouTube Video")
     author = metadata.get("author", "Unknown Channel")
     thumb_url = metadata.get("thumbnail") or f"https://img.youtube.com/vi/{vid_id}/hqdefault.jpg"
 
-    card_html = f"""<div class="flex flex-col md:flex-row items-start md:items-center gap-4 md:gap-5 p-4 md:p-5 rounded-2xl bg-slate-900/80 border border-blue-500/20 backdrop-blur-xl shadow-xl shadow-blue-950/30 mb-6 transition-all duration-300 hover:border-blue-500/40">
-<div class="w-full md:w-56 aspect-video md:h-32 flex-shrink-0 overflow-hidden rounded-xl border border-blue-500/25 shadow-md bg-black">
-<img src="{thumb_url}" class="w-full h-full object-cover" alt="Video Thumbnail" />
-</div>
-<div class="flex-1 min-w-0">
-<h3 class="text-xl font-bold text-white tracking-tight truncate mb-2">{title}</h3>
-<div class="flex flex-wrap items-center gap-2 mb-3">
-<span class="inline-flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-medium bg-blue-950/60 text-blue-300 border border-blue-500/20 shadow-sm">📺 {author}</span>
-<span class="inline-flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-medium bg-blue-950/60 text-blue-300 border border-blue-500/20 shadow-sm">📊 {len(segments):,} segments</span>
-<span class="inline-flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-medium bg-blue-950/60 text-blue-300 border border-blue-500/20 shadow-sm">📝 ~{words:,} words</span>
-{status_html}
-</div>
-<a href="https://www.youtube.com/watch?v={vid_id}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/30 transition-all duration-200 hover:-translate-y-0.5 no-underline">▶ Watch on YouTube</a>
-</div>
-</div>"""
-    st.markdown(card_html, unsafe_allow_html=True)
+    col_header_card, col_header_switch = st.columns([5.5, 1.2])
+    with col_header_card:
+        card_html = f"""
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 8px 14px; border-radius: 12px; background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(59, 130, 246, 0.2); box-shadow: 0 4px 16px rgba(0,0,0,0.25);">
+            <div style="display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1;">
+                <img src="{thumb_url}" style="width: 72px; height: 42px; object-fit: cover; border-radius: 6px; border: 1px solid rgba(59, 130, 246, 0.25); flex-shrink: 0;" alt="Video Thumbnail" />
+                <div style="min-width: 0; flex: 1;">
+                    <div style="font-weight: 700; font-size: 0.95rem; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3;" title="{title}">{title}</div>
+                    <div style="font-size: 0.75rem; color: #94a3b8; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 2px;">
+                        <span style="color: #cbd5e1; font-weight: 500;">📺 {author}</span>
+                        <span>•</span>
+                        <span>{len(segments):,} segments</span>
+                        <span>•</span>
+                        <span>~{words:,} words</span>
+                        <span>•</span>
+                        {status_html}
+                    </div>
+                </div>
+            </div>
+            <a href="https://www.youtube.com/watch?v={vid_id}" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 5px; padding: 6px 14px; border-radius: 8px; font-size: 0.78rem; font-weight: 600; background: rgba(37, 99, 235, 0.2); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); text-decoration: none; flex-shrink: 0;" title="Open on YouTube">
+                ▶ Watch on YouTube
+            </a>
+        </div>
+        """
+        st.markdown(card_html, unsafe_allow_html=True)
+
+    with col_header_switch:
+        if st.button("🔄 Switch Video", key="top_switch_video", type="secondary", use_container_width=True, help="Clear active video and load a new YouTube video link"):
+            reset_video_state()
+            st.rerun()
 
     # Embedded Interactive Video Player
     current_seek = int(st.session_state.get("player_start_time", 0))
-    with st.expander(f"🎬 Video Player • Seek Time: {format_time(current_seek)}", expanded=False):
+    with st.expander(f"🎬 Video Player • Position: {format_time(current_seek)}", expanded=False):
         col_vid_player, col_vid_actions = st.columns([3, 1])
         with col_vid_player:
             st.video(f"https://www.youtube.com/watch?v={vid_id}", start_time=current_seek)
         with col_vid_actions:
             st.markdown(f"**Current Position:** `{format_time(current_seek)}`")
-            st.caption("Seek timestamp updates automatically when clicking timestamps in transcript explorer or citations.")
+            st.caption("Seek timestamp updates automatically when clicking timestamps in transcript or answers.")
             if current_seek > 0:
                 if st.button("⏮️ Play from 00:00", key="global_reset_seek", use_container_width=True):
                     st.session_state.player_start_time = 0
                     st.rerun()
 
-    # Feature Tabs
-    tab_chat, tab_summary, tab_transcript = st.tabs(["💬 Hybrid RAG Chat", "📝 Deep Summary", "📄 Transcript Explorer"])
+    # Feature Tabs (Clean, descriptive, no jargon)
+    tab_chat, tab_summary, tab_transcript = st.tabs(["💬 Ask Questions", "📝 Summary", "📄 Transcript"])
     with tab_chat:
         render_chat_ui()
     with tab_summary:

@@ -2,38 +2,38 @@ import streamlit as st
 import requests
 from frontend.utils.youtube import extract_video_id
 from frontend.utils.session import reset_video_state
-from frontend.services.api_client import initialize_video, API_BASE_URL
+from frontend.services.api import initialize_video, API_BASE_URL
 
 
 def render_landing_page():
-    """Render a clean, modern landing page with a primary search bar and feature showcase."""
-    hero_html = """<div class="flex flex-col items-center justify-center text-center py-8 px-4 max-w-3xl mx-auto" style="text-align: center; margin-left: auto; margin-right: auto;">
-<div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold tracking-wider uppercase bg-blue-950/70 text-blue-400 border border-blue-500/30 shadow-md shadow-blue-500/10 mb-4 backdrop-blur-md" style="margin-left: auto; margin-right: auto;">
-⚡ HYBRID RAG • LANGGRAPH • SMART SUMMARISATION
+    """Render a clean, modern landing page with a primary search bar and clear feature cards."""
+    # ── Clean, Non-Technical Hero Section ─────────────────────────────────────
+    hero_html = """<div class="landing-hero" style="text-align: center; margin: 0 auto; max-width: 820px; padding: 1.5rem 1rem 1rem 1rem;">
+<div class="hero-badge" style="display: inline-flex; align-items: center; gap: 8px; padding: 6px 16px; border-radius: 9999px; font-size: 0.8rem; font-weight: 600; letter-spacing: 0.04em; background: rgba(30, 58, 138, 0.4); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); margin-bottom: 1.25rem;">
+🎬 Intelligent YouTube Assistant
 </div>
-<h1 class="text-4xl md:text-5xl lg:text-6xl font-black tracking-tight text-white mb-4 text-center" style="text-align: center;">
-Chat with Any <span class="bg-gradient-to-r from-blue-400 via-sky-300 to-indigo-400 bg-clip-text text-transparent">YouTube Video</span>
+<h1 class="hero-title" style="font-size: 2.75rem; font-weight: 800; line-height: 1.2; letter-spacing: -0.025em; color: #ffffff; margin-bottom: 0.85rem;">
+Chat & Learn from Any <span class="gradient-text" style="background: linear-gradient(135deg, #60a5fa 0%, #93c5fd 50%, #818cf8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">YouTube Video</span>
 </h1>
-<p class="text-base md:text-lg text-slate-400 max-w-2xl mx-auto leading-relaxed font-normal text-center" style="text-align: center; margin-left: auto; margin-right: auto;">
-Instant conversational intelligence, deep hierarchical summaries, and timestamp-grounded answers<br/>
-from any video's verbatim transcript.
+<p class="hero-subtitle" style="font-size: 1.05rem; font-weight: 400; line-height: 1.6; color: #94a3b8; max-width: 620px; margin: 0 auto 1.5rem auto;">
+Paste any link to ask questions with exact timestamps, get instant summaries, or search through every spoken word.
 </p>
 </div>"""
     st.markdown(hero_html, unsafe_allow_html=True)
 
-    # Clean centered input form
+    # ── Search Input Box ──────────────────────────────────────────────────────
     with st.form("youtube_input_form", clear_on_submit=False):
         col_input, col_submit = st.columns([5, 1])
         with col_input:
             url_value = st.text_input(
                 "YouTube Video URL",
-                placeholder="https://www.youtube.com/watch?v=... (Watch, Shorts, or Embed)",
+                placeholder="Paste any YouTube video link here... (e.g. https://www.youtube.com/watch?v=...)",
                 label_visibility="collapsed",
                 key="main_url_field",
                 value=st.session_state.get("prefill_url", ""),
             )
         with col_submit:
-            submitted = st.form_submit_button("🚀 Analyze", type="primary", use_container_width=True)
+            submitted = st.form_submit_button("🚀 Explore", type="primary", use_container_width=True)
 
         if submitted:
             if url_value and url_value.strip():
@@ -41,9 +41,9 @@ from any video's verbatim transcript.
                 st.session_state.prefill_url = ""
                 st.rerun()
             else:
-                st.warning("⚠️ Please paste a valid YouTube URL first.")
+                st.warning("⚠️ Please paste a valid YouTube video link first.")
 
-    # Status / loading area directly beneath the input field (not at top of page)
+    # Status / loading area
     status_area = st.container()
 
     active_url = st.session_state.get("submitted_video_url")
@@ -52,10 +52,10 @@ from any video's verbatim transcript.
         video_id = extract_video_id(active_url)
         with status_area:
             if not video_id:
-                st.error("⚠️ Invalid YouTube URL. Please provide a valid watch, embed, or shorts link.")
+                st.error("⚠️ Invalid YouTube link. Please paste a valid YouTube watch, embed, or shorts link.")
             else:
                 reset_video_state()
-                with st.spinner("🚀 Analyzing video transcript & generating vector index..."):
+                with st.spinner("⏳ Loading video transcript and preparing your chat..."):
                     try:
                         init_data = initialize_video(video_id)
                         metadata = init_data.get("metadata", {})
@@ -63,7 +63,7 @@ from any video's verbatim transcript.
                         transcript_segments = init_data.get("transcript_segments", [])
 
                         if not transcript_text:
-                            st.error("❌ No transcript could be retrieved for this video.")
+                            st.error("❌ No subtitles or transcript found for this video. Please try another video.")
                         else:
                             st.session_state.video_id = video_id
                             st.session_state.metadata = metadata
@@ -72,53 +72,60 @@ from any video's verbatim transcript.
                             st.rerun()
 
                     except requests.exceptions.ConnectionError:
-                        st.error(f"🔌 Cannot reach backend at {API_BASE_URL}. Please ensure the backend is running.")
+                        st.error(f"🔌 Cannot reach backend server at {API_BASE_URL}. Please ensure it is running.")
                     except Exception as error:
                         error_str = str(error)
                         st.error(f"❌ Failed to load video: {error_str}")
                         with st.expander("🔍 Error Details"):
                             st.code(error_str, language="text")
 
-    # 1-Click Sample Videos
+    # ── Instant Sample Video Chips ───────────────────────────────────────────
     st.markdown("<div style='margin-top: 10px; margin-bottom: 25px;'>", unsafe_allow_html=True)
     st.caption("Try an instant sample video:")
     c1, c2, c3 = st.columns(3)
     with c1:
-        if st.button("💡 What is RAG? (4 min)", use_container_width=True, key="s1"):
-            st.session_state.submitted_video_url = "https://www.youtube.com/watch?v=T-D1OfcDW1M"
-            st.rerun()
-    with c2:
-        if st.button("🤖 AI Agents Explained (12 min)", use_container_width=True, key="s2"):
+        if st.button("💡 Tech & AI Explained (5 min)", use_container_width=True, key="s1"):
             st.session_state.submitted_video_url = "https://www.youtube.com/watch?v=sal78ACtGTc"
             st.rerun()
+    with c2:
+        if st.button("🔍 How Search Engines Work (4 min)", use_container_width=True, key="s2"):
+            st.session_state.submitted_video_url = "https://www.youtube.com/watch?v=T-D1OfcDW1M"
+            st.rerun()
     with c3:
-        if st.button("⚡ Attention Is All You Need (15 min)", use_container_width=True, key="s3"):
+        if st.button("🎙️ Habit Building & Focus (7 min)", use_container_width=True, key="s3"):
             st.session_state.submitted_video_url = "https://www.youtube.com/watch?v=bQ5BoolX9Ag"
             st.rerun()
     st.markdown("</div>", unsafe_allow_html=True)
 
-    cards_html = """<div class="grid grid-cols-1 md:grid-cols-3 gap-5 my-8">
-<div class="p-6 rounded-2xl bg-slate-900/60 border border-blue-500/15 backdrop-blur-xl shadow-xl shadow-blue-950/20 hover:border-blue-500/40 hover:-translate-y-1 transition-all duration-300 group">
-<div class="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/25 flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform duration-200">💬</div>
-<h3 class="text-lg font-bold text-white mb-2">Hybrid RAG Chat</h3>
-<p class="text-sm text-slate-400 leading-relaxed">Combines dense semantic vectors with BM25 keyword matching via Reciprocal Rank Fusion. Every response is strictly grounded with verifiable timestamp links.</p>
-</div>
-<div class="p-6 rounded-2xl bg-slate-900/60 border border-blue-500/15 backdrop-blur-xl shadow-xl shadow-blue-950/20 hover:border-blue-500/40 hover:-translate-y-1 transition-all duration-300 group">
-<div class="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/25 flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform duration-200">📝</div>
-<h3 class="text-lg font-bold text-white mb-2">Deep Video Summaries</h3>
-<p class="text-sm text-slate-400 leading-relaxed">Hierarchical map-reduce summarization that generates executive overviews, chronological key topics, and actionable takeaways in seconds.</p>
-</div>
-<div class="p-6 rounded-2xl bg-slate-900/60 border border-blue-500/15 backdrop-blur-xl shadow-xl shadow-blue-950/20 hover:border-blue-500/40 hover:-translate-y-1 transition-all duration-300 group">
-<div class="w-12 h-12 rounded-xl bg-sky-500/10 border border-sky-500/25 flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform duration-200">📄</div>
-<h3 class="text-lg font-bold text-white mb-2">Interactive Transcript Explorer</h3>
-<p class="text-sm text-slate-400 leading-relaxed">Browse every spoken word with precise timestamps. Search terms across the entire video and click any segment to jump directly to that exact moment on YouTube.</p>
-</div>
-</div>
-<div class="flex flex-wrap items-center justify-center gap-2.5 my-6">
-<span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900/80 text-blue-300 border border-blue-500/20 shadow-sm backdrop-blur-sm">⚡ Hybrid Retrieval</span>
-<span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900/80 text-blue-300 border border-blue-500/20 shadow-sm backdrop-blur-sm">🧠 Smart Summarization</span>
-<span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900/80 text-blue-300 border border-blue-500/20 shadow-sm backdrop-blur-sm">🎯 Gemini Embeddings</span>
-<span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900/80 text-blue-300 border border-blue-500/20 shadow-sm backdrop-blur-sm">🔍 BM25 + Vector RRF</span>
-<span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900/80 text-blue-300 border border-blue-500/20 shadow-sm backdrop-blur-sm">🛡️ Multi-Key Fallback</span>
-</div>"""
-    st.markdown(cards_html, unsafe_allow_html=True)
+    # ── Clean Feature Cards (What it does, zero jargon) ───────────────────────
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown(
+            """<div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 16px; padding: 1.5rem; height: 100%; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);">
+<div style="width: 44px; height: 44px; border-radius: 12px; background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.25); display: flex; align-items: center; justify-content: center; font-size: 1.35rem; margin-bottom: 1rem;">💬</div>
+<h3 style="font-size: 1.15rem; font-weight: 700; color: #ffffff; margin-bottom: 0.5rem; letter-spacing: -0.01em;">Ask Any Question</h3>
+<p style="font-size: 0.9rem; color: #94a3b8; line-height: 1.55; margin: 0;">Ask naturally about anything in the video. Every answer includes clickable timestamps that take you straight to the exact scene.</p>
+</div>""",
+            unsafe_allow_html=True,
+        )
+
+    with col2:
+        st.markdown(
+            """<div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 16px; padding: 1.5rem; height: 100%; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);">
+<div style="width: 44px; height: 44px; border-radius: 12px; background: rgba(99, 102, 241, 0.12); border: 1px solid rgba(99, 102, 241, 0.25); display: flex; align-items: center; justify-content: center; font-size: 1.35rem; margin-bottom: 1rem;">⚡</div>
+<h3 style="font-size: 1.15rem; font-weight: 700; color: #ffffff; margin-bottom: 0.5rem; letter-spacing: -0.01em;">Instant Summary</h3>
+<p style="font-size: 0.9rem; color: #94a3b8; line-height: 1.55; margin: 0;">Get clear overviews, key takeaways, and structured chapter summaries in seconds without watching hours of footage.</p>
+</div>""",
+            unsafe_allow_html=True,
+        )
+
+    with col3:
+        st.markdown(
+            """<div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 16px; padding: 1.5rem; height: 100%; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);">
+<div style="width: 44px; height: 44px; border-radius: 12px; background: rgba(14, 165, 233, 0.12); border: 1px solid rgba(14, 165, 233, 0.25); display: flex; align-items: center; justify-content: center; font-size: 1.35rem; margin-bottom: 1rem;">🔍</div>
+<h3 style="font-size: 1.15rem; font-weight: 700; color: #ffffff; margin-bottom: 0.5rem; letter-spacing: -0.01em;">Search Every Word</h3>
+<p style="font-size: 0.9rem; color: #94a3b8; line-height: 1.55; margin: 0;">Explore the complete transcript with synchronized timestamps. Find specific topics and jump immediately to that point in the player.</p>
+</div>""",
+            unsafe_allow_html=True,
+        )
+

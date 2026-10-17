@@ -94,11 +94,15 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install flake8 -r requirements.txt
+          pip install ruff pytest -r requirements.txt
 
-      - name: Lint Critical Syntax Errors
+      - name: Lint with Ruff
         run: |
-          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          ruff check .
+
+      - name: Run Unit Tests
+        run: |
+          python -m unittest discover tests
 
       - name: Validate Python Compilation
         run: |
@@ -117,8 +121,8 @@ jobs:
       - name: Run Core Module Smoke Test
         run: |
           python -c "
-          from backend.core.chunking import create_timestamp_aware_chunks
-          from backend.core.graph import build_langgraph
+          from backend.core.ingestion.chunking import create_timestamp_aware_chunks
+          from backend.core.workflow.graph import build_langgraph
           from backend.utils.timestamp import format_timestamp, parse_timestamp_seconds
           assert format_timestamp(65) == '01:05'
           assert parse_timestamp_seconds('01:05') == 65

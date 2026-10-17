@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import AsyncGenerator, Dict, Any, List
+from typing import AsyncGenerator, Dict, Any
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.output_parsers import StrOutputParser
@@ -143,21 +143,3 @@ async def generate_summary_stream(
             yield {"type": "token", "token": token}
 
     yield {"type": "end"}
-
-
-def generate_summary(transcript_text: str, llm=None) -> str:
-    """
-    Synchronous entrypoint for backwards compatibility.
-    Runs the asynchronous parallel map-reduce workflow.
-    """
-    try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            import nest_asyncio
-            nest_asyncio.apply()
-            return loop.run_until_complete(generate_summary_async(transcript_text, llm))
-        else:
-            return asyncio.run(generate_summary_async(transcript_text, llm))
-    except Exception:
-        # Fallback if loop handling fails
-        return asyncio.run(generate_summary_async(transcript_text, llm))

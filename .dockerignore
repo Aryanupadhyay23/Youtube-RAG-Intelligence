@@ -1,19 +1,62 @@
-.env
-.env.*
+# Git & GitHub
 .git
 .gitignore
-__pycache__
-*.pyc
+.github
+
+# Docker & CI/CD deployment files
+.dockerignore
+Dockerfile
+deploy/
+appspec.yml
+
+# Environment variables & secrets
+.env
+.env.*
+.streamlit/secrets.toml
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Python caches & build artifacts
+__pycache__/
+*.py[cod]
 *.pyo
 *.pyd
-.pytest_cache
-.vscode
-.idea
-venv/
-.venv/
-env/
+*.egg-info/
+build/
+dist/
+
+# Tests & Coverage
+tests/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# IDEs & OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs, Databases & Data directories
 logs/
-.cache/
-data/
 *.log
+data/
+.cache/
 scratch/
+instructions.txt
+*.sqlite
+*.sqlite3
+*.sqlite-shm
+*.sqlite-wal
+*.db
+chroma_db/
+faiss_index/
+
+# Documentation
+README.md

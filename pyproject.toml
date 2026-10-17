@@ -1,0 +1,30 @@
+[project]
+name = "youtube-rag-intelligence"
+version = "1.0.0"
+description = "AI-powered YouTube video assistant (Corrective RAG + smart summaries)"
+requires-python = ">=3.12"
+
+[project.optional-dependencies]
+dev = ["ruff>=0.6.0", "pytest>=8.0.0"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+extend-exclude = [".venv", "__pycache__", "logs", "deploy"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B"]
+ignore = ["E501", "B008"]
+
+[tool.ruff.lint.per-file-ignores]
+# app.py manipulates sys.path before importing project modules
+"frontend/app.py" = ["E402"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+

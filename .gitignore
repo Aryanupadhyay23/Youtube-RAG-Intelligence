@@ -1,22 +1,61 @@
-.env
-venv/
+# Byte-compiled / optimized / DLL files
 __pycache__/
-*.pyc
-*.pyo
-.DS_Store
-*.egg-info/
-dist/
+*.py[cod]
+*$py.class
+*.pyd
+
+# Environments and Virtualenv
+.venv/
+venv/
+ENV/
+env/
+env.bak/
+venv.bak/
+
+# Environment variables & secrets
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+
+# Distribution / packaging
 build/
-.idea/
+dist/
+*.egg-info/
+*.egg
+
+# Testing, Linting & Coverage
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# IDEs and Editors
 .vscode/
-*.sqlite
-# Ignore SQLite databases
+.idea/
+*.swp
+*.swo
+*~
+
+# Operating System Files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+
+# Databases & Local Vector Stores
 *.sqlite
 *.sqlite3
 *.sqlite-shm
 *.sqlite-wal
-instructions.txt
-.cache/
-data/
+*.db
+chroma_db/
+faiss_index/
+
+# Data, Logs & Caches
 logs/
-.venv/
+*.log
+data/
+.cache/
+scratch/
+instructions.txt

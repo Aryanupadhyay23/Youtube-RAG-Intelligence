@@ -4,8 +4,8 @@ import logging
 import chromadb
 from langchain_community.vectorstores import Chroma
 from langchain_community.retrievers import BM25Retriever
-from backend.core.embeddings import load_embeddings
-from backend.core.chunking import create_timestamp_aware_chunks
+from backend.core.ingestion.embeddings import load_embeddings
+from backend.core.ingestion.chunking import create_timestamp_aware_chunks
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 _ephemeral_client = chromadb.EphemeralClient()
 
 
-def _sanitize_collection_name(video_id: str) -> str:
+def sanitize_collection_name(video_id: str) -> str:
     """Chroma collection names must be 3-63 characters and match [a-zA-Z0-9_-]."""
     clean_id = re.sub(r"[^a-zA-Z0-9_-]", "_", video_id)
     return f"yt_{clean_id}"[:63]
@@ -21,7 +21,7 @@ def _sanitize_collection_name(video_id: str) -> str:
 
 def delete_video_collection(video_id: str):
     """Cleanly delete the in-memory Chroma collection and trigger garbage collection."""
-    col_name = _sanitize_collection_name(video_id)
+    col_name = sanitize_collection_name(video_id)
     try:
         _ephemeral_client.delete_collection(col_name)
         logger.info(f"Deleted in-memory collection '{col_name}' for video {video_id}.")
@@ -40,7 +40,7 @@ def build_retrievers(video_id: str, transcript_segments: list):
         raise ValueError("No valid chunks created from transcript segments.")
 
     embeddings = load_embeddings()
-    col_name = _sanitize_collection_name(video_id)
+    col_name = sanitize_collection_name(video_id)
 
     # Clean existing collection with the same name if present
     delete_video_collection(video_id)

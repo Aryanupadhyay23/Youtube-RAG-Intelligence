@@ -4,9 +4,9 @@ from langchain_ollama import ChatOllama
 from backend.config import (
     OLLAMA_HOST,
     OLLAMA_API_KEYS,
-    OLLAMA_API_KEY,
     OLLAMA_SUMMARY_MODEL,
     OLLAMA_MODEL,
+    OLLAMA_NUM_CTX,
 )
 from backend.utils.constants import LLM_TEMPERATURE
 
@@ -23,7 +23,7 @@ def _mask_api_key(key: str) -> str:
 
 
 def _create_ollama_client(model_name: str, api_key: str, key_index: int, total_keys: int):
-    """Instantiate a ChatOllama instance with Authorization header and failure logging."""
+    """Instantiate a ChatOllama instance with Authorization header, context window limit, and failure logging."""
     client_kwargs = (
         {"headers": {"Authorization": f"Bearer {api_key}"}}
         if api_key
@@ -33,6 +33,7 @@ def _create_ollama_client(model_name: str, api_key: str, key_index: int, total_k
         model=model_name,
         base_url=OLLAMA_HOST,
         temperature=LLM_TEMPERATURE,
+        num_ctx=OLLAMA_NUM_CTX,
         client_kwargs=client_kwargs,
     )
 
@@ -60,7 +61,7 @@ def _create_ollama_client(model_name: str, api_key: str, key_index: int, total_k
 
 def _build_model_with_fallbacks(model_name: str):
     """Build primary ChatOllama runnable chained with fallback models across all configured keys."""
-    keys = OLLAMA_API_KEYS if OLLAMA_API_KEYS else ([OLLAMA_API_KEY] if OLLAMA_API_KEY else [""])
+    keys = OLLAMA_API_KEYS or [""]
     total_keys = len(keys)
     logger.info(f"Initialized Ollama model '{model_name}' with {total_keys} API key(s) for fallback support.")
 

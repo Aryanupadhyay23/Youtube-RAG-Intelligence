@@ -1,5 +1,5 @@
 import streamlit as st
-from frontend.services.api_client import stream_summary, request_summary
+from frontend.services.api import stream_summary, request_summary, API_BASE_URL
 
 
 def render_summary_ui():
@@ -12,10 +12,8 @@ def render_summary_ui():
         return
 
     word_count = len(transcript_text.split())
-    if len(transcript_text) > 8000:
-        st.info(f"📦 Long transcript detected ({word_count:,} words). Parallel map-reduce summarization will be used.")
-    else:
-        st.info(f"📄 Standard transcript detected ({word_count:,} words). Single-pass summarization will be used.")
+    st.info(f"📄 Video length: ~{word_count:,} words. Click below to generate a clear summary with key takeaways and major topics.")
+
 
     if st.button("✨ Generate Summary", type="primary"):
         status_box = st.empty()
@@ -41,7 +39,7 @@ def render_summary_ui():
                     has_error = True
                     error_val = str(value)
                     if "connection" in error_val.lower() or "connect" in error_val.lower():
-                        st.error("🔌 Could not connect to backend server on port 8000.")
+                        st.error(f"🔌 Could not connect to backend server at {API_BASE_URL}.")
                     elif "timeout" in error_val.lower():
                         st.error("⏱️ Summary request timed out. Please try again.")
                     else:

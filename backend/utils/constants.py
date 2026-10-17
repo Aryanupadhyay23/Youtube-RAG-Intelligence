@@ -2,7 +2,7 @@ APP_TITLE = "YouTube RAG Intelligence"
 APP_CAPTION = "AI-Powered Chat, Summaries, and Transcript Explorer"
 
 # Conversation Memory
-MEMORY_WINDOW = 5
+MEMORY_WINDOW = 20
 
 # Chunking Parameters
 CHUNK_SIZE = 1000
@@ -20,17 +20,6 @@ RRF_K = 60
 MAX_RETRIEVAL_ATTEMPTS = 2
 
 # Model Names
-LLM_MODEL = "qwen/qwen3.8-27b"
-SUMMARY_MODEL = "qwen/qwen3.8-27b"
 EMBEDDING_MODEL = "models/gemini-embedding-2"
 LLM_TEMPERATURE = 0.3
 
-# Suggested Questions
-QUICK_QUESTIONS = [
-    "What is the main topic?",
-    "What are the key takeaways?",
-    "Who is speaking?",
-    "What conclusions are drawn?",
-    "Are there any statistics mentioned?",
-    "What problems are discussed?",
-]

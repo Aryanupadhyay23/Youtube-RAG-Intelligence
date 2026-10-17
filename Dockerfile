@@ -1,31 +1,63 @@
-FROM python:3.12-slim
+# ==========================================
+# Stage 1: Builder (Compiles C/C++ extensions)
+# ==========================================
+FROM python:3.12-slim AS builder
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /build
+
+# Install compiler tools required for building native wheels (e.g. chroma-hnswlib)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create isolated virtual environment
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+COPY requirements.txt .
+
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt && \
+    # Strip unnecessary files and test directories from virtual environment to minimize size
+    find /opt/venv -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true && \
+    find /opt/venv -type f -name "*.pyc" -delete && \
+    find /opt/venv -type f -name "*.pyo" -delete && \
+    find /opt/venv -type d -name "tests" -exec rm -rf {} + 2>/dev/null || true && \
+    find /opt/venv -type d -name "test" -exec rm -rf {} + 2>/dev/null || true
+
+# ==========================================
+# Stage 2: Final Minimal Runtime Stage
+# ==========================================
+FROM python:3.12-slim AS runner
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PATH="/opt/venv/bin:$PATH"
 
 # Create non-root user
 RUN useradd -m -u 1000 appuser
 
 WORKDIR /app
 
-# Install build tools (needed for chroma-hnswlib) and dependencies
-COPY requirements.txt .
+# Copy only the compiled virtual environment from builder stage
+COPY --from=builder /opt/venv /opt/venv
 
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends build-essential \
-    && pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir -r requirements.txt \
-    && apt-get purge -y --auto-remove build-essential \
-    && rm -rf /var/lib/apt/lists/*
+# Copy only the necessary runtime code
+COPY --chown=appuser:appuser backend /app/backend
+COPY --chown=appuser:appuser frontend /app/frontend
+COPY --chown=appuser:appuser .streamlit /app/.streamlit
 
-# Copy application files and ensure logs directory permissions
-COPY --chown=appuser:appuser . .
-RUN mkdir -p /app/logs && chown -R appuser:appuser /app/logs && chmod 777 /app/logs
+# Create and grant permissions for logs directory
+RUN mkdir -p /app/logs && chown -R appuser:appuser /app/logs && chmod 775 /app/logs
 
 # Run as non-root user
 USER appuser
 
-# Hugging Face Spaces public port
+# Streamlit UI container port
 EXPOSE 7860
-
-ENV PYTHONUNBUFFERED=1
 
 # Start FastAPI internally and Streamlit publicly
 CMD ["sh", "-c", "uvicorn backend.main:app --host 0.0.0.0 --port 8000 & exec streamlit run frontend/app.py --server.port=7860 --server.address=0.0.0.0 --server.fileWatcherType=none --browser.gatherUsageStats=false"]

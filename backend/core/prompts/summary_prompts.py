@@ -1,14 +1,4 @@
 from langchain_core.prompts import ChatPromptTemplate
-from pydantic import BaseModel, Field
-
-class ChunkSummary(BaseModel):
-    summary: str = Field(description="Factual summary of the chunk")
-
-class SectionSummary(BaseModel):
-    title: str = Field(description="Topic title")
-    summary: str = Field(description="Combined summary of the section")
-    start_time: int = Field(description="Start time in seconds")
-    end_time: int = Field(description="End time in seconds")
 
 CHUNK_SUMMARY_PROMPT = ChatPromptTemplate.from_messages([
     ("system", """You are a transcription summarizer.
@@ -26,23 +16,6 @@ RULES:
 Timestamp: {timestamp}
 
 Please summarize this chunk.""")
-])
-
-SECTION_SUMMARY_PROMPT = ChatPromptTemplate.from_messages([
-    ("system", """You are a section summarizer.
-Your task is to identify the main topic being discussed across this group of chunk summaries.
-
-RULES:
-- Combine related information and remove repeated points.
-- Preserve important technical details and do not introduce new facts.
-- Maintain logical order.
-- Keep timestamps associated with the appropriate topic."""),
-    ("human", """Chunk summaries:
-{chunk_summaries}
-
-Timestamps: {timestamps}
-
-Please summarize this section.""")
 ])
 
 FINAL_SUMMARY_PROMPT = ChatPromptTemplate.from_messages([

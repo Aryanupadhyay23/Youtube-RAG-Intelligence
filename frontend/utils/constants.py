@@ -1,14 +1,9 @@
 """Frontend UI constants and configuration."""
 
-APP_TITLE = "YouTube RAG Intelligence"
-APP_CAPTION = "Chat with any YouTube video using hybrid RAG, LangGraph, and smart summarisation."
+APP_TITLE = "YouTube Video Assistant"
+APP_CAPTION = "Chat with any YouTube video, get instant summaries, and jump to exact timestamps."
+
 
 # Memory window size (turns retained in active chat)
-MEMORY_WINDOW = 5
+MEMORY_WINDOW = 20
 
-# Suggested quick questions for the chat tab
-QUICK_QUESTIONS = [
-    "What are the main topics discussed?",
-    "Summarize key takeaways in bullet points",
-    "What action items or conclusions were made?",
-]

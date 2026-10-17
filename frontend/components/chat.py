@@ -10,7 +10,7 @@ def render_chat_ui():
     chat_history = st.session_state.get("chat_history", [])
 
     # Render previous conversational turns
-    for idx, turn in enumerate(chat_history):
+    for turn in chat_history:
         with st.chat_message("user", avatar="👤"):
             st.markdown(turn["user"])
         with st.chat_message("assistant", avatar="🤖"):

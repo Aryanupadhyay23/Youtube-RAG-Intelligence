@@ -19,11 +19,21 @@ async def evaluate_retrieval(state: RAGState, config: RunnableConfig) -> dict:
     combined_content = "\n\n---\n\n".join(d.page_content for d in docs[:3])
     messages = GRADER_PROMPT.format_messages(question=query, document=combined_content)
     try:
-        response = await config["configurable"]["llm"].with_structured_output(GradeResult).ainvoke(messages)
-        grade = "GOOD" if getattr(response, "relevant", True) else "POOR"
+        response = await config["configurable"]["llm"].with_structured_output(
+            GradeResult, method="function_calling"
+        ).ainvoke(messages)
+        is_rel = bool(getattr(response, "relevant", False))
+        score = getattr(response, "score", None)
+        if score is not None and score == 0:
+            is_rel = False
+        grade = "GOOD" if is_rel else "POOR"
     except Exception as e:
-        logger.warning(f"Grading fallback to GOOD: {e}")
-        grade = "GOOD"
+        err_msg = str(e).lower()
+        if "not relevant" in err_msg or "irrelevant" in err_msg or "score: 0" in err_msg:
+            grade = "POOR"
+        else:
+            logger.warning(f"Grading fallback to POOR: {e}")
+            grade = "POOR"
 
     logger.info(f"Retrieval graded as: {grade}")
     return {"retrieval_score": grade}

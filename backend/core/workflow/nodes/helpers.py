@@ -44,7 +44,7 @@ async def rephrase_query(state: RAGState, prompt, output_schema, llm, **kwargs) 
     )
 
     try:
-        response = await llm.with_structured_output(output_schema).ainvoke(messages)
+        response = await llm.with_structured_output(output_schema, method="function_calling").ainvoke(messages)
         new_query = getattr(response, "standalone_query", getattr(response, "corrected_query", query))
         if hasattr(response, "needs_rewrite") and not response.needs_rewrite:
             new_query = query

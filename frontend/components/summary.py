@@ -15,7 +15,8 @@ def render_summary_ui():
     st.info(f"📄 Video length: ~{word_count:,} words. Click below to generate a clear summary with key takeaways and major topics.")
 
 
-    if st.button("✨ Generate Summary", type="primary"):
+    btn_label = "🔄 Regenerate Summary" if st.session_state.get("summary") else "✨ Generate Summary"
+    if st.button(btn_label, type="primary"):
         status_box = st.empty()
         summary_box = st.empty()
         full_summary = ""
@@ -47,17 +48,19 @@ def render_summary_ui():
                     break
 
             if full_summary:
-                summary_box.markdown(full_summary)
+                summary_box.empty()
                 status_box.empty()
                 st.session_state.summary = full_summary
+                st.rerun()
             elif not has_error:
                 # Fallback to synchronous request if streaming returned nothing
                 status_box.caption("🔄 Finalizing summary generation…")
                 fallback_summary = request_summary(transcript_text)
                 if fallback_summary and fallback_summary.strip():
-                    summary_box.markdown(fallback_summary)
+                    summary_box.empty()
                     status_box.empty()
                     st.session_state.summary = fallback_summary
+                    st.rerun()
                 else:
                     status_box.empty()
                     st.warning("⚠️ Summary was empty. Please try again.")

@@ -52,16 +52,28 @@ def fetch_from_supadata(video_id: str) -> Tuple[str, List[Dict[str, Any]]]:
         try:
             client = Supadata(api_key=api_key)
 
-            # Retrieve transcript using native mode
+            # First attempt: prioritize English captions ("en")
             result = None
             try:
-                result = client.transcript(url=video_url, mode="native")
-            except Exception as native_err:
-                logger.debug(f"Supadata native mode with key #{key_num} failed: {native_err}, trying auto mode...")
+                result = client.transcript(url=video_url, lang="en", mode="auto")
+                if not getattr(result, "content", None):
+                    result = None
+                else:
+                    logger.info(f"Retrieved English transcript for video {video_id} via Supadata Key #{key_num}.")
+            except Exception as en_err:
+                logger.debug(f"English transcript not available for {video_id} ({en_err}), falling back to default language...")
+                result = None
+
+            # Fallback attempt: use default/native language if English is not available
+            if not result:
                 try:
-                    result = client.transcript(url=video_url, mode="auto")
-                except Exception:
-                    result = client.youtube.transcript(video_id=video_id)
+                    result = client.transcript(url=video_url, mode="native")
+                except Exception as native_err:
+                    logger.debug(f"Supadata native mode with key #{key_num} failed: {native_err}, trying auto mode...")
+                    try:
+                        result = client.transcript(url=video_url, mode="auto")
+                    except Exception:
+                        result = client.youtube.transcript(video_id=video_id)
 
             content = getattr(result, "content", None)
             if not content:

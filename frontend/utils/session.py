@@ -51,6 +51,4 @@ def reset_video_state():
     st.session_state.player_start_time = 0
     st.session_state._memory_synced_video = None
     st.session_state.prefill_url = ""
-    if "main_url_field" in st.session_state:
-        st.session_state.main_url_field = ""
 

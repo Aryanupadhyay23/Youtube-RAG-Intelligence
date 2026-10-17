@@ -114,6 +114,7 @@ def render_sidebar():
                 if st.button("🔄 Switch Video", use_container_width=True, help="Clear active video and load a new YouTube link"):
                     from frontend.utils.session import reset_video_state
                     reset_video_state()
+                    st.session_state.pop("main_url_field", None)
                     st.rerun()
 
             # Chat session list for current video

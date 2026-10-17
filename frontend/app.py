@@ -89,6 +89,7 @@ if st.session_state.get("video_id") and st.session_state.get("transcript_text"):
     with col_header_switch:
         if st.button("🔄 Switch Video", key="top_switch_video", type="secondary", use_container_width=True, help="Clear active video and load a new YouTube video link"):
             reset_video_state()
+            st.session_state.pop("main_url_field", None)
             st.rerun()
 
     # Embedded Interactive Video Player

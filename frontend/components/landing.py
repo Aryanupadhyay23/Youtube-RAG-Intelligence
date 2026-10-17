@@ -22,6 +22,9 @@ Paste any link to ask questions with exact timestamps, get instant summaries, or
     st.markdown(hero_html, unsafe_allow_html=True)
 
     # ── Search Input Box ──────────────────────────────────────────────────────
+    if st.session_state.get("prefill_url"):
+        st.session_state.main_url_field = st.session_state.pop("prefill_url")
+
     with st.form("youtube_input_form", clear_on_submit=False):
         col_input, col_submit = st.columns([5, 1])
         with col_input:
@@ -30,7 +33,6 @@ Paste any link to ask questions with exact timestamps, get instant summaries, or
                 placeholder="Paste any YouTube video link here... (e.g. https://www.youtube.com/watch?v=...)",
                 label_visibility="collapsed",
                 key="main_url_field",
-                value=st.session_state.get("prefill_url", ""),
             )
         with col_submit:
             submitted = st.form_submit_button("🚀 Explore", type="primary", use_container_width=True)

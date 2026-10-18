@@ -30,10 +30,10 @@ env:
   # ─── MASTER CI/CD PERMISSION ─────────────────────────────────────────────
   # Set to "true" ONLY when you want GitHub Actions to run CI and deploy.
   # Set to "false" to pause/block automatic execution on git push.
-  EXECUTE_PIPELINE: "true"
+  EXECUTE_PIPELINE: "false"
 
   # ─── PLATFORM TOGGLES ────────────────────────────────────────────────────
-  ENABLE_AWS: "true"
+  ENABLE_AWS: "false"
 
   # ─── CLOUD CONFIGURATION ──────────────────────────────────────────────────
   AWS_REGION: ap-southeast-2

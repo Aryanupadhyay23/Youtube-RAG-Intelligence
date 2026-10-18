@@ -8,9 +8,10 @@ Chat with YouTube videos in natural language, generate structured multi-part exe
 
 ---
 
-## Live Deployment
+## Live Deployment (Active Monday to Friday, 9:00 AM to 5:00 PM)
 
-- **AWS EC2 Production Deployment**: [http://aryan-projects.duckdns.org:80/](http://aryan-projects.duckdns.org:80/) *(Active Monday to Friday, 9:00 AM to 5:00 PM)*
+- **Frontend Application**: [https://aryan-projects.duckdns.org/youtube-rag](https://aryan-projects.duckdns.org/youtube-rag)
+- **Backend API (Swagger UI)**: [https://aryan-projects.duckdns.org/youtube-rag-backend/docs](https://aryan-projects.duckdns.org/youtube-rag-backend/docs)
 
 ---
 
@@ -216,6 +217,8 @@ Youtube-RAG-Intelligence/
 | Method | Endpoint | Description |
 |---|---|---|
 | `GET` | `/` | Root API health status and service metadata |
+| `GET` | `/docs` | Interactive Swagger UI API documentation (`/youtube-rag-backend/docs` in production) |
+| `GET` | `/redoc` | Interactive ReDoc API documentation (`/youtube-rag-backend/redoc` in production) |
 | `GET` | `/health`, `/api/health` | Health check for Docker, load balancers, and monitoring |
 | `POST` | `/init` | Ingest video, fetch transcript & metadata, build in-memory vector stores |
 | `POST` | `/chat/stream` | Stream reasoning states, answer tokens, and citations via SSE |
@@ -308,6 +311,7 @@ Start both the backend server and frontend interface:
 ```bash
 uvicorn backend.main:app --reload --port 8000
 ```
+Interactive Swagger UI documentation is available at `http://localhost:8000/docs`.
 
 **Terminal 2 — Streamlit Frontend (Port 8501):**
 ```bash
@@ -361,7 +365,7 @@ The automated deployment pipeline in `.github/workflows/deploy.yml`:
 1. **Lints & Validates**: Runs Ruff, Python syntax validation, and automated unit test suite.
 2. **Builds & Pushes**: Builds the multi-stage Docker image using Buildx and pushes to Amazon ECR.
 3. **Deploys via CodeDeploy**: Packages deployment bundle, uploads to Amazon S3, and triggers an in-place deployment to the AWS EC2 instance.
-4. **Starts Container**: `deploy/scripts/start_docker.sh` executes on the EC2 host, binding HTTP port 80 to the Streamlit UI and port 8000 to FastAPI with an automatic restart policy (`--restart unless-stopped`).
+4. **Starts Container**: `deploy/scripts/start_docker.sh` executes on the EC2 host, launching FastAPI (with `--root-path /youtube-rag-backend`) and Streamlit (with `--server.baseUrlPath=youtube-rag`) mapped to ports 8000 and 7860, exposed at `https://aryan-projects.duckdns.org/youtube-rag` and `https://aryan-projects.duckdns.org/youtube-rag-backend/docs` with an automatic restart policy (`--restart unless-stopped`).
 
 ---
 

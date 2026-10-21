@@ -4,6 +4,7 @@ import streamlit as st
 from frontend.services.api import (
     get_remote_chats,
     get_remote_chat_history,
+    create_remote_chat,
     delete_remote_chat,
 )
 
@@ -106,6 +107,18 @@ def delete_current_chat():
         delete_chat(current_chat_id)
     else:
         create_new_chat()
+
+
+def clear_current_chat():
+    """Clear all messages and LangGraph checkpoint for current chat from session and backend Redis."""
+    current_chat_id = st.session_state.get("current_chat_id")
+    video_id = st.session_state.get("video_id", "")
+    username = get_current_username()
+    st.session_state.chat_history = []
+    save_current_chat([])
+    if current_chat_id and video_id:
+        delete_remote_chat(current_chat_id, video_id=video_id, username=username)
+        create_remote_chat(video_id=video_id, chat_id=current_chat_id, title="New Chat", username=username)
 
 
 def switch_user(new_username: str):

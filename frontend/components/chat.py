@@ -1,6 +1,6 @@
 import streamlit as st
 from frontend.services.api import stream_chat, initialize_video, API_BASE_URL
-from frontend.services.chat_storage import save_current_chat
+from frontend.services.chat_storage import save_current_chat, clear_current_chat
 from frontend.utils.timestamp import linkify_timestamps
 
 
@@ -122,8 +122,7 @@ def render_chat_ui():
         col_clear, col_exp = st.columns([1, 1])
         with col_clear:
             if st.button("🗑️ Clear Chat", key="btn_clear_chat", use_container_width=True):
-                st.session_state.chat_history = []
-                save_current_chat([])
+                clear_current_chat()
                 st.rerun()
         with col_exp:
             export_data = "\n".join(

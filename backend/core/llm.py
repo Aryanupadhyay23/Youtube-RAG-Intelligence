@@ -17,9 +17,9 @@ def _mask_api_key(key: str) -> str:
     """Mask key for secure logging."""
     if not key:
         return "None"
-    if len(key) <= 8:
+    if len(key) <= 6:
         return "***"
-    return f"{key[:6]}...{key[-4:]}"
+    return f"{key[:4]}***"
 
 
 def _create_ollama_client(model_name: str, api_key: str, key_index: int, total_keys: int):

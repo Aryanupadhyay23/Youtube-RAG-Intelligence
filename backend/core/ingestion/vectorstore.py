@@ -2,12 +2,17 @@ import re
 import gc
 import logging
 import chromadb
-from langchain_community.vectorstores import Chroma
+from langchain_chroma import Chroma
 from langchain_community.retrievers import BM25Retriever
 from backend.core.ingestion.embeddings import load_embeddings
 from backend.core.ingestion.chunking import create_timestamp_aware_chunks
 
 logger = logging.getLogger(__name__)
+
+
+def _bm25_tokenize(text: str) -> list[str]:
+    """Tokenize text into lowercase alphanumeric tokens for BM25 sparse matching."""
+    return re.findall(r"\w+", text.lower())
 
 # Single in-memory ephemeral client (0 MB disk footprint)
 _ephemeral_client = chromadb.EphemeralClient()
@@ -55,7 +60,11 @@ def build_retrievers(video_id: str, transcript_segments: list):
 
     try:
         from backend.utils.constants import BM25_TOP_K
-        bm25_retriever = BM25Retriever.from_documents(documents, k=BM25_TOP_K)
+        bm25_retriever = BM25Retriever.from_documents(
+            documents,
+            k=BM25_TOP_K,
+            preprocess_func=_bm25_tokenize,
+        )
     except Exception as e:
         logger.warning(f"BM25 initialization failed: {e}")
         bm25_retriever = None

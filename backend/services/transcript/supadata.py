@@ -17,7 +17,7 @@ def get_current_key_info() -> Dict[str, Any]:
     return {
         "total_keys": num_keys,
         "active_key_number": curr_idx + 1 if num_keys > 0 else 0,
-        "active_key_preview": (SUPADATA_KEYS[curr_idx][:8] + "...") if num_keys > 0 else "None",
+        "active_key_preview": (SUPADATA_KEYS[curr_idx][:4] + "***") if num_keys > 0 else "None",
     }
 
 
@@ -112,13 +112,21 @@ def fetch_from_supadata(video_id: str) -> Tuple[str, List[Dict[str, Any]]]:
             _active_key_index = (current_idx + 1) % num_keys
 
         except Exception as error:
-            err_msg = str(error)
-            logger.warning(
-                f"Supadata Key #{key_num} of {num_keys} encountered error: {err_msg}. "
-                f"Auto-switching to next available key..."
+            err_msg = str(error).lower()
+            is_quota_or_auth = any(
+                indicator in err_msg
+                for indicator in ["401", "402", "429", "unauthorized", "quota", "rate limit", "credits"]
             )
-            attempts.append(f"Key #{key_num}: {err_msg}")
-            _active_key_index = (current_idx + 1) % num_keys
+            if is_quota_or_auth:
+                logger.warning(
+                    f"Supadata Key #{key_num} of {num_keys} encountered quota/auth error: {error}. "
+                    f"Auto-switching to next available key..."
+                )
+                attempts.append(f"Key #{key_num}: {str(error)}")
+                _active_key_index = (current_idx + 1) % num_keys
+            else:
+                logger.error(f"Supadata encountered non-retryable error: {error}")
+                raise
 
     # All keys failed
     detail = " | ".join(attempts)

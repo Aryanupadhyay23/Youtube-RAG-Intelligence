@@ -32,45 +32,48 @@ def _ensure_app_state(request: Request):
 async def chat_stream(req: ChatRequest, request: Request):
     """Stream chat response and graph events using Server-Sent Events (SSE)."""
     app_state = _ensure_app_state(request)
-    stores = app_state.video_stores.get(req.video_id)
+    stores = app_state.video_stores.get_and_acquire(req.video_id)
     if not stores:
         async def not_initialized_stream():
             yield f"event: error\ndata: {json.dumps({'error': 'Video not initialized. Call /init first.'})}\n\n"
         return StreamingResponse(not_initialized_stream(), media_type="text/event-stream")
 
-    clean_user = clean_username(req.username)
-    thread_id = f"{clean_user}_{req.video_id}_{req.chat_id}"
-    config = {
-        "configurable": {
-            "thread_id": thread_id,
-            "vector_store": stores["vector_store"],
-            "bm25_retriever": stores["bm25_retriever"],
-            "llm": load_llm(),
+    try:
+        clean_user = clean_username(req.username)
+        thread_id = f"{clean_user}_{req.video_id}_{req.chat_id}"
+        config = {
+            "configurable": {
+                "thread_id": thread_id,
+                "vector_store": stores["vector_store"],
+                "bm25_retriever": stores["bm25_retriever"],
+                "llm": load_llm(),
+            }
         }
-    }
 
-    # Check if a LangGraph checkpoint already exists in Redis/RAM for this thread
-    existing_tuple = app_state.checkpointer.get_tuple(config)
+        # Check if a LangGraph checkpoint already exists in Redis/RAM for this thread (non-blocking)
+        existing_tuple = await asyncio.to_thread(app_state.checkpointer.get_tuple, config)
 
-    inputs = {
-        "query": req.query,
-        "video_id": req.video_id,
-        "retrieval_attempt": 0,
-        "retrieved_documents": [],
-        "retrieval_score": "",
-        "context": "",
-        "answer": "",
-    }
+        inputs = {
+            "query": req.query,
+            "video_id": req.video_id,
+            "retrieval_attempt": 0,
+            "retrieved_documents": [],
+            "retrieval_score": "",
+            "context": "",
+            "answer": "",
+        }
 
-    # If first turn in checkpointer, hydrate initial turns from Redis
-    if not existing_tuple:
-        historical_messages = req.chat_history or (
-            redis_memory.get_messages(req.chat_id, limit=MEMORY_WINDOW) if req.chat_id else []
-        )
-        inputs["chat_history"] = historical_messages
+        # If first turn in checkpointer, hydrate initial turns from Redis
+        if not existing_tuple:
+            historical_messages = req.chat_history or (
+                await asyncio.to_thread(redis_memory.get_messages, req.chat_id, limit=MEMORY_WINDOW) if req.chat_id else []
+            )
+            inputs["chat_history"] = historical_messages
+    except Exception:
+        app_state.video_stores.release(req.video_id)
+        raise
 
     async def event_generator():
-        app_state.video_stores.acquire(req.video_id)
         full_answer = ""
         try:
             async for event in app_state.rag_graph.astream_events(inputs, config=config, version="v1"):

@@ -32,8 +32,8 @@ async def evaluate_retrieval(state: RAGState, config: RunnableConfig) -> dict:
         if "not relevant" in err_msg or "irrelevant" in err_msg or "score: 0" in err_msg:
             grade = "POOR"
         else:
-            logger.warning(f"Grading fallback to POOR: {e}")
-            grade = "POOR"
+            logger.warning(f"Grading failed with unexpected error, defaulting to GOOD: {e}")
+            grade = "GOOD"
 
     logger.info(f"Retrieval graded as: {grade}")
     return {"retrieval_score": grade}

@@ -36,3 +36,14 @@ class TestUpstashRedisMemory(unittest.TestCase):
         self.service.delete_session(self.test_video_id, chat_id, username="testuser")
         self.assertIsNone(self.service.get_session(self.test_video_id, chat_id, username="testuser"))
         self.assertEqual(self.service.get_messages(chat_id), [])
+
+    def test_get_user_session_scoping(self):
+        chat_id = f"test_chat_004_{self.ts}"
+        self.service.create_session(self.test_video_id, chat_id, "Scoped Chat", username="alice")
+        # Alice should see her session
+        alice_sess = self.service.get_user_session(chat_id, username="alice")
+        self.assertIsNotNone(alice_sess)
+        self.assertEqual(alice_sess["title"], "Scoped Chat")
+        # Bob should not see Alice's session
+        bob_sess = self.service.get_user_session(chat_id, username="bob")
+        self.assertIsNone(bob_sess)

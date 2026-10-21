@@ -55,9 +55,6 @@ OLLAMA_SUMMARY_MODEL = _clean_env(os.environ.get("OLLAMA_SUMMARY_MODEL", "gemma4
 OLLAMA_MODEL = _clean_env(os.environ.get("OLLAMA_MODEL")) or OLLAMA_SUMMARY_MODEL
 OLLAMA_NUM_CTX = int(_clean_env(os.environ.get("OLLAMA_NUM_CTX", "131072")) or "131072")
 
-# --- Observability Endpoint Protection (optional) ---
-# When set, the /api/logs* endpoints require the header: X-Admin-Key: <ADMIN_API_KEY>
-ADMIN_API_KEY = _clean_env(os.environ.get("ADMIN_API_KEY"))
 
 # --- Ephemeral Vector Store Cache Configuration ---
 MAX_ACTIVE_VIDEOS = int(_clean_env(os.environ.get("MAX_ACTIVE_VIDEOS", "10")) or "10")

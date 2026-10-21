@@ -2,7 +2,6 @@
 streamlit==1.57.0
 fastapi==0.143.0
 uvicorn==0.54.0
-sse-starlette==2.1.2
 pydantic==2.14.0
 
 # LangChain & LangGraph Ecosystem
@@ -18,7 +17,6 @@ langgraph==1.2.0
 # State Persistence & Redis Checkpointer
 langgraph-checkpoint-upstash-redis>=0.1.0
 upstash-redis>=1.8.0
-redis==8.1.0
 
 # Vector Store & Hybrid Search
 chromadb==1.5.9
@@ -27,8 +25,5 @@ rank_bm25==0.2.2
 
 # YouTube Ingestion & Utilities
 supadata==1.6.0
-youtube-transcript-api==1.2.4
 python-dotenv==1.2.2
-numpy>=1.26.0
-pandas==2.3.3
 requests==2.33.1

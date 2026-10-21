@@ -37,7 +37,7 @@ def format_chat_history(history: list) -> list:
 
 async def rephrase_query(state: RAGState, prompt, output_schema, llm, **kwargs) -> dict:
     """Generic query rewriting logic with structured output fallback."""
-    query = state.get("rewritten_query", state["query"])
+    query = state["query"]
     messages = prompt.format_messages(
         chat_history=format_chat_history(state.get("chat_history", [])),
         **kwargs

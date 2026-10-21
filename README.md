@@ -1,8 +1,8 @@
 # YouTube RAG Intelligence
 
-An enterprise-grade video intelligence platform that transforms any YouTube video into an interactive, grounded knowledge base. Built with **LangGraph (Corrective RAG - CRAG)**, **LangChain**, **Ollama (`gemma4:31b-cloud`)**, **Google Gemini embeddings**, **hybrid retrieval (in-memory ChromaDB + BM25 with Reciprocal Rank Fusion)**, and **Upstash Redis serverless checkpointing memory**.
+A video intelligence platform that transforms any YouTube video into an interactive, grounded knowledge base. Built with **LangGraph (Corrective RAG - CRAG)**, **LangChain**, **Ollama (`gemma4:31b-cloud`)**, **Google Gemini embeddings**, **hybrid retrieval (in-memory ChromaDB + BM25 with Reciprocal Rank Fusion)**, and **Upstash Redis serverless checkpointing memory**.
 
-Chat with YouTube videos in natural language, generate structured multi-part executive summaries, and inspect synchronized transcripts with millisecond-accurate timestamp navigation.
+Chat with YouTube videos in natural language, generate structured multi-part executive summaries, and inspect synchronized transcripts with timestamp navigation.
 
 > Transcripts in any language are automatically ingested and answered fluently in the user's preferred language with timestamp citations.
 
@@ -23,7 +23,7 @@ Chat with YouTube videos in natural language, generate structured multi-part exe
   - *Conversational De-referencing (`rewrite_query`)*: Automatically resolves pronouns and follow-up context into standalone retrieval queries.
   - *Correction Loop (`correct_query`)*: Reformulates failed or ambiguous searches when initial retrieval fails quality checks.
 - **Hybrid Dense + Sparse Retrieval with RRF**: Combines semantic embeddings (Google Gemini via in-memory ChromaDB) and keyword frequency (BM25) fused with Reciprocal Rank Fusion (RRF, $k=60$) for top-tier recall and precision.
-- **Interactive Transcript Explorer**: Instant client-side fuzzy search, millisecond-accurate synchronized video jumping upon clicking timestamps, and one-click plain text transcript exports.
+- **Interactive Transcript Explorer**: Instant client-side search, synchronized video jumping upon clicking timestamps, and one-click plain text transcript exports.
 - **Long-Form Smart Summarizer**: Map-reduce summarization pipeline designed for multi-hour videos without token exhaustion, generating structured key takeaways, core topics, and actionable summaries.
 - **Timestamp Citations**: Every generated answer cites verifiable video timestamps (e.g., `[14:25]`) that directly control the embedded video player.
 - **Multi-Key Failover Resilience**:
@@ -106,7 +106,7 @@ flowchart TD
 | **Embeddings** | Google Gemini (`models/gemini-embedding-2`) | High-density semantic vector representations |
 | **Vector Indexing** | In-Memory ChromaDB | RAM-only ephemeral collections with LRU TTL garbage collection |
 | **Lexical Search** | `rank_bm25` | Sparse keyword retrieval scoring |
-| **Transcript Ingestion** | Supadata API & YouTube Transcript API | Multi-language transcript extraction with 4-key failover |
+| **Transcript Ingestion** | Supadata API | Multi-language transcript extraction with 4-key failover |
 | **Web Fallback** | Tavily Search API | External web search when video lacks required context |
 | **Backend API** | FastAPI & Uvicorn | Asynchronous REST and Server-Sent Events (SSE) streaming server |
 | **Frontend UI** | Streamlit | Responsive dark-mode interface with synchronized video player |
@@ -128,7 +128,7 @@ Youtube-RAG-Intelligence/
 │       ├── install_dependencies.sh <- Prepares EC2 Docker host environment
 │       ├── start_docker.sh         <- Pulls container from ECR and launches
 │       └── stop_docker.sh          <- Stops running deployment containers
-├── tests/                        <- Automated unit test suite (11 unit tests)
+├── tests/                        <- Automated unit test suite (5 test files, 11 tests)
 │   ├── test_chunking.py          <- Text chunking & boundary tests
 │   ├── test_redis_memory.py      <- Upstash Redis persistence & fallback tests
 │   ├── test_retrieval.py         <- Hybrid search & RRF fusion tests
@@ -142,8 +142,7 @@ Youtube-RAG-Intelligence/
 │   │   ├── chat/                 <- LangGraph SSE streaming (/chat/stream)
 │   │   ├── summary/              <- Map-reduce summarization (/summary, /summary/stream)
 │   │   ├── redis/                <- Upstash Redis session memory & checkpointer APIs
-│   │   ├── health/               <- Health checks & datewise log observability
-│   │   └── dependencies.py       <- Admin authentication gates
+│   │   └── health/               <- Health checks & datewise log observability
 │   ├── core/
 │   │   ├── checkpointer.py       <- UpstashRedisSaver checkpointer factory
 │   │   ├── llm.py                <- Ollama model loader with 3-key failover
@@ -232,8 +231,8 @@ Youtube-RAG-Intelligence/
 | `DELETE` | `/api/chats` | Clear all chat sessions for a video |
 | `GET` | `/api/memory/health` | Upstash Redis connection status check |
 | `POST` | `/reset` | Evict a specific video vector store from memory cache |
-| `GET` | `/api/logs/dates` | List available datewise log files (optional admin key required) |
-| `GET` | `/api/logs` | Fetch datewise Markdown logs (optional admin key required) |
+| `GET` | `/api/logs/dates` | List available datewise log files |
+| `GET` | `/api/logs` | Fetch datewise Markdown logs |
 
 ---
 
@@ -298,8 +297,7 @@ UPSTASH_REDIS_REST_TOKEN="your_upstash_rest_token"
 MAX_ACTIVE_VIDEOS=10
 VIDEO_INACTIVITY_TTL_MINUTES=45
 
-# --- Observability & Admin (Optional) ---
-ADMIN_API_KEY="optional_admin_password_for_logs"
+# --- Observability (Optional) ---
 LANGSMITH_TRACING=false
 ```
 
@@ -341,7 +339,7 @@ The application features a **multi-stage, ultra-slim Docker build** (`builder` -
 ### Key Container Optimizations
 - **Multi-Stage Separation**: Build dependencies (`build-essential` and gcc compilers for `chroma-hnswlib`) are isolated in the `builder` stage and omitted entirely from the final `runner` image.
 - **Virtualenv Artifact Stripping**: Prunes development tests, `__pycache__`, and `*.pyc`/`*.pyo` files from `/opt/venv` prior to copying.
-- **Selective Layer Copying**: Copies only necessary source folders (`backend/`, `frontend/`, `.streamlit/`) to prevent leaking development files, tests, or credentials.
+- **Selective Layer Copying**: Copies only necessary source folders (`backend/`, `frontend/`) to prevent leaking development files, tests, or credentials.
 - **Non-Root Execution**: Runs under an unprivileged `appuser` (UID 1000) with write permissions restricted to `/app/logs`.
 
 ### 1. Build and Run Container Locally
@@ -387,7 +385,6 @@ The automated deployment pipeline in `.github/workflows/deploy.yml`:
 | `TAVILY_API_KEY` | No | — | External web search fallback key |
 | `MAX_ACTIVE_VIDEOS` | No | `10` | Maximum video vector stores retained in RAM |
 | `VIDEO_INACTIVITY_TTL_MINUTES` | No | `45` | Cache eviction timeout for idle sessions |
-| `ADMIN_API_KEY` | No | — | Header key to protect `/api/logs*` |
 
 ---
 

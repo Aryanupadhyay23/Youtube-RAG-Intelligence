@@ -37,14 +37,9 @@ async def init_video(req: InitRequest, request: Request):
             }
 
         # Concurrently fetch transcript and video metadata in parallel
-        if not req.transcript_segments:
-            fetch_task = asyncio.to_thread(fetch_transcript, req.video_id)
-            meta_task = asyncio.to_thread(get_video_metadata, req.video_id)
-            (transcript_text, transcript_segments), metadata = await asyncio.gather(fetch_task, meta_task)
-        else:
-            transcript_segments = req.transcript_segments
-            transcript_text = req.transcript_text or " ".join(s.get("text", "") for s in transcript_segments)
-            metadata = await asyncio.to_thread(get_video_metadata, req.video_id)
+        fetch_task = asyncio.to_thread(fetch_transcript, req.video_id)
+        meta_task = asyncio.to_thread(get_video_metadata, req.video_id)
+        (transcript_text, transcript_segments), metadata = await asyncio.gather(fetch_task, meta_task)
 
         vector_store, bm25_retriever = await asyncio.to_thread(build_retrievers, req.video_id, transcript_segments)
 

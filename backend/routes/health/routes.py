@@ -1,6 +1,5 @@
 import re
-from fastapi import APIRouter, HTTPException, Depends
-from backend.routes.dependencies import require_admin
+from fastapi import APIRouter, HTTPException
 from backend.utils.logger import get_available_log_dates, get_datewise_logs_markdown
 
 router = APIRouter(tags=["Health & Observability"])
@@ -13,13 +12,13 @@ def health():
     return {"status": "healthy", "service": "YouTube RAG Intelligence Backend"}
 
 
-@router.get("/api/logs/dates", dependencies=[Depends(require_admin)])
+@router.get("/api/logs/dates")
 def get_log_dates():
     """Retrieve all available datewise log dates."""
     return {"dates": get_available_log_dates()}
 
 
-@router.get("/api/logs", dependencies=[Depends(require_admin)])
+@router.get("/api/logs")
 def get_logs(date: str = "", level: str = "", query: str = ""):
     """Retrieve datewise logs formatted in clean Markdown."""
     if date and not re.fullmatch(r"^\d{4}-\d{2}-\d{2}$", date):

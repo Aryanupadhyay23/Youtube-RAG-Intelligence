@@ -34,6 +34,16 @@ class EphemeralVideoStoreCache:
             self._last_accessed[video_id] = time.time()
             return self._stores[video_id]
 
+    def get_and_acquire(self, video_id: str) -> Optional[Dict[str, Any]]:
+        """Retrieve cached store entry and increment ref count atomically."""
+        with self._lock:
+            if video_id not in self._stores:
+                return None
+            self._stores.move_to_end(video_id)
+            self._last_accessed[video_id] = time.time()
+            self._ref_counts[video_id] = self._ref_counts.get(video_id, 0) + 1
+            return self._stores[video_id]
+
     def put(self, video_id: str, entry: Dict[str, Any]):
         """Put store entry into cache, evicting oldest/idle videos if capacity is exceeded."""
         with self._lock:

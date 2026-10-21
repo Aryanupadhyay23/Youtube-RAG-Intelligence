@@ -1,3 +1,4 @@
+import html
 import streamlit as st
 from frontend.utils.constants import APP_TITLE
 from frontend.services.chat_storage import (
@@ -31,6 +32,7 @@ def render_sidebar():
 
         # ── User Account / Memory Profile ─────────────────────────────────────
         current_user = get_current_username()
+        safe_user = html.escape(str(current_user))
         is_default = (current_user == "default")
 
         st.markdown(
@@ -39,11 +41,11 @@ def render_sidebar():
                 <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
                     <span style="font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8;">User Profile</span>
                     <span style="font-size: 0.75rem; font-weight: 600; padding: 2px 8px; border-radius: 9999px; background: {'rgba(59, 130, 246, 0.2)' if is_default else 'rgba(16, 185, 129, 0.2)'}; color: {'#60a5fa' if is_default else '#34d399'}; border: 1px solid {'rgba(59, 130, 246, 0.35)' if is_default else 'rgba(16, 185, 129, 0.35)'};">
-                        {'Default Mode' if is_default else f'@{current_user}'}
+                        {'Default Mode' if is_default else f'@{safe_user}'}
                     </span>
                 </div>
                 <p style="font-size: 0.78rem; color: #94a3b8; line-height: 1.4; margin: 0 0 8px 0;">
-                    {'Conversations are saved automatically under <b>default</b>. Enter your username below to save and reload your personal chats.' if is_default else f'Active user: <b>@{current_user}</b>. All conversations you conduct are automatically stored in memory.'}
+                    {'Conversations are saved automatically under <b>default</b>. Enter your username below to save and reload your personal chats.' if is_default else f'Active user: <b>@{safe_user}</b>. All conversations you conduct are automatically stored in memory.'}
                 </p>
             </div>
             """,
@@ -97,7 +99,7 @@ def render_sidebar():
             f"""
             <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; padding: 6px 2px 8px 2px; display: flex; align-items: center; justify-content: space-between;">
                 <span>Conversation Memories</span>
-                <span style="font-size: 10px; color: #60a5fa; font-weight: 600;">{'@' + current_user}</span>
+                <span style="font-size: 10px; color: #60a5fa; font-weight: 600;">{'@' + safe_user}</span>
             </div>
             """,
             unsafe_allow_html=True,
@@ -153,7 +155,7 @@ def render_sidebar():
             saved_sessions = get_saved_user_sessions(current_user)
 
             if saved_sessions:
-                st.caption(f"Showing {len(saved_sessions)} saved conversation(s) for @{current_user}:")
+                st.caption(f"Showing {len(saved_sessions)} saved conversation(s) for @{safe_user}:")
                 for s in saved_sessions:
                     chat_id = s.get("chat_id", "")
                     vid_id = s.get("video_id", "")
@@ -161,12 +163,16 @@ def render_sidebar():
                     display_title = (title[:32] + "…") if len(title) > 32 else title
                     updated = s.get("updated_at", "")
 
+                    safe_display_title = html.escape(str(display_title))
+                    safe_vid_id = html.escape(str(vid_id))
+                    safe_updated = html.escape(str(updated))
+
                     with st.container():
                         st.markdown(
                             f"""
                             <div style="padding: 10px 12px; border-radius: 10px; background: rgba(15, 23, 42, 0.65); border: 1px solid rgba(59, 130, 246, 0.2); margin-bottom: 6px;">
-                                <div style="font-weight: 600; font-size: 0.85rem; color: #ffffff; margin-bottom: 2px;">💬 {display_title}</div>
-                                <div style="font-size: 0.72rem; color: #94a3b8;">🎬 Video: <code style="color: #60a5fa;">{vid_id}</code> • 🕒 {updated}</div>
+                                <div style="font-weight: 600; font-size: 0.85rem; color: #ffffff; margin-bottom: 2px;">💬 {safe_display_title}</div>
+                                <div style="font-size: 0.72rem; color: #94a3b8;">🎬 Video: <code style="color: #60a5fa;">{safe_vid_id}</code> • 🕒 {safe_updated}</div>
                             </div>
                             """,
                             unsafe_allow_html=True,
@@ -189,7 +195,7 @@ def render_sidebar():
                         <span style="font-size: 1.6rem; display: block; margin-bottom: 6px;">🧠</span>
                         <div style="font-size: 0.88rem; font-weight: 600; color: #ffffff; margin-bottom: 4px;">No Saved Conversations Yet</div>
                         <p style="font-size: 0.76rem; color: #94a3b8; line-height: 1.4; margin: 0;">
-                            Paste any YouTube video link to start chatting. All conversations for <b>@{current_user}</b> are automatically preserved here.
+                            Paste any YouTube video link to start chatting. All conversations for <b>@{safe_user}</b> are automatically preserved here.
                         </p>
                     </div>
                     """,

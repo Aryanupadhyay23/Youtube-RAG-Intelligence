@@ -1,4 +1,5 @@
 import sys
+import html
 from pathlib import Path
 
 # Ensure project root is in sys.path regardless of execution directory
@@ -56,9 +57,10 @@ if st.session_state.get("video_id") and st.session_state.get("transcript_text"):
     else:
         status_html = '<span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; background: rgba(136, 19, 55, 0.4); color: #fb7185; border: 1px solid rgba(244, 63, 94, 0.3);">🔴 Offline</span>'
 
-    title = metadata.get("title", "YouTube Video")
-    author = metadata.get("author", "Unknown Channel")
-    thumb_url = metadata.get("thumbnail") or f"https://img.youtube.com/vi/{vid_id}/hqdefault.jpg"
+    title = html.escape(str(metadata.get("title", "YouTube Video")))
+    author = html.escape(str(metadata.get("author", "Unknown Channel")))
+    thumb_url = html.escape(str(metadata.get("thumbnail") or f"https://img.youtube.com/vi/{vid_id}/hqdefault.jpg"))
+    safe_vid_id = html.escape(str(vid_id))
 
     col_header_card, col_header_switch = st.columns([5.5, 1.2])
     with col_header_card:
@@ -79,7 +81,7 @@ if st.session_state.get("video_id") and st.session_state.get("transcript_text"):
                     </div>
                 </div>
             </div>
-            <a href="https://www.youtube.com/watch?v={vid_id}" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 5px; padding: 6px 14px; border-radius: 8px; font-size: 0.78rem; font-weight: 600; background: rgba(37, 99, 235, 0.2); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); text-decoration: none; flex-shrink: 0;" title="Open on YouTube">
+            <a href="https://www.youtube.com/watch?v={safe_vid_id}" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 5px; padding: 6px 14px; border-radius: 8px; font-size: 0.78rem; font-weight: 600; background: rgba(37, 99, 235, 0.2); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); text-decoration: none; flex-shrink: 0;" title="Open on YouTube">
                 ▶ Watch on YouTube
             </a>
         </div>

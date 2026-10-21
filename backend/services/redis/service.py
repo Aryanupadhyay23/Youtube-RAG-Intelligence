@@ -150,6 +150,25 @@ class UpstashRedisMemoryService:
                 pass
         return None
 
+    def get_user_session(self, chat_id: str, username: str = "default") -> Optional[Dict[str, Any]]:
+        """Retrieve metadata for a specific session scoped to a user."""
+        u = clean_username(username)
+        if not self.is_configured:
+            prefix = f"{u}:"
+            for fb_key, sessions in self._fallback_sessions.items():
+                if fb_key.startswith(prefix) and chat_id in sessions:
+                    return sessions[chat_id]
+            return None
+
+        cat_key = self._user_catalog_key(u)
+        res = self._execute(["HGET", cat_key, chat_id])
+        if res:
+            try:
+                return json.loads(res)
+            except Exception:
+                pass
+        return None
+
     def create_session(
         self,
         video_id: str,

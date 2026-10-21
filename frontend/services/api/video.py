@@ -11,8 +11,6 @@ def initialize_video(
     """Call backend /init to fetch transcript & metadata and build hybrid vector stores."""
     payload = {
         "video_id": video_id,
-        "transcript_text": transcript_text or "",
-        "transcript_segments": transcript_segments or [],
     }
     r = requests.post(f"{API_BASE_URL}/init", json=payload, timeout=180)
     if r.status_code != 200:

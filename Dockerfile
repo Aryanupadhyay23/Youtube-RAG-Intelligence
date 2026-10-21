@@ -48,7 +48,6 @@ COPY --from=builder /opt/venv /opt/venv
 # Copy only the necessary runtime code
 COPY --chown=appuser:appuser backend /app/backend
 COPY --chown=appuser:appuser frontend /app/frontend
-COPY --chown=appuser:appuser .streamlit /app/.streamlit
 
 # Create and grant permissions for logs directory
 RUN mkdir -p /app/logs && chown -R appuser:appuser /app/logs && chmod 775 /app/logs

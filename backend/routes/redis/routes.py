@@ -1,6 +1,9 @@
+import logging
 from fastapi import APIRouter, Request
 from backend.routes.redis.schemas import CreateChatRequest, AddMessageRequest
 from backend.services.redis import redis_memory, clean_username
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Conversation Memory"])
 
@@ -33,9 +36,15 @@ def create_chat(req: CreateChatRequest):
 
 @router.get("/api/chats/{chat_id}")
 def get_chat_history(chat_id: str, video_id: str = "", username: str = "default"):
-    """Retrieve all message turns for a chat session from Redis."""
+    """Retrieve all message turns for a chat session from Redis scoped to user."""
+    session = (
+        redis_memory.get_session(video_id, chat_id, username=username)
+        if video_id
+        else redis_memory.get_user_session(chat_id, username=username)
+    )
+    if not session:
+        return {"chat_id": chat_id, "messages": [], "session": None}
     messages = redis_memory.get_messages(chat_id)
-    session = redis_memory.get_session(video_id, chat_id, username=username) if video_id else None
     return {"chat_id": chat_id, "messages": messages, "session": session}
 
 
@@ -58,8 +67,19 @@ def delete_chat_session(chat_id: str, request: Request, video_id: str = "", user
     redis_memory.delete_session(video_id, chat_id, username=username)
     clean_user = clean_username(username)
     thread_id = f"{clean_user}_{video_id}_{chat_id}"
-    if hasattr(request.app.state, "checkpointer"):
-        request.app.state.checkpointer.delete_thread(thread_id)
+    checkpointer = getattr(request.app.state, "checkpointer", None)
+    if not checkpointer:
+        try:
+            from backend.core.checkpointer import get_redis_checkpointer
+            checkpointer = get_redis_checkpointer()
+            request.app.state.checkpointer = checkpointer
+        except Exception as e:
+            logger.warning(f"Could not load checkpointer: {e}")
+    if checkpointer and hasattr(checkpointer, "delete_thread"):
+        try:
+            checkpointer.delete_thread(thread_id)
+        except Exception as e:
+            logger.warning(f"Failed to delete checkpointer thread {thread_id}: {e}")
     return {"status": "deleted", "chat_id": chat_id}
 
 

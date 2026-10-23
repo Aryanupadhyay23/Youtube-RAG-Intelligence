@@ -1,6 +1,6 @@
 def format_timestamp(seconds: float) -> str:
     """Format seconds into HH:MM:SS or MM:SS."""
-    seconds = int(seconds)
+    seconds = max(0, int(seconds))
     hours = seconds // 3600
     minutes = (seconds % 3600) // 60
     secs = seconds % 60
@@ -23,10 +23,20 @@ build_youtube_timestamp_url = get_youtube_timestamp_url
 
 
 def parse_timestamp_seconds(ts: str) -> int:
-    """Convert HH:MM:SS or MM:SS string into integer seconds."""
-    parts = [int(p) for p in ts.strip("[]").split(":")]
-    if len(parts) == 3:
-        return parts[0] * 3600 + parts[1] * 60 + parts[2]
-    elif len(parts) == 2:
-        return parts[0] * 60 + parts[1]
+    """Convert HH:MM:SS or MM:SS string into integer seconds.
+
+    Numeric single-part values are treated as seconds. Returns 0 for
+    malformed input instead of raising.
+    """
+    try:
+        parts = ts.strip("[]").split(":")
+        ints = [int(p.strip()) for p in parts if p.strip()]
+    except (ValueError, AttributeError):
+        return 0
+    if len(ints) == 3:
+        return ints[0] * 3600 + ints[1] * 60 + ints[2]
+    if len(ints) == 2:
+        return ints[0] * 60 + ints[1]
+    if len(ints) == 1:
+        return max(0, ints[0])
     return 0

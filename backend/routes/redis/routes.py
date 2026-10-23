@@ -1,6 +1,8 @@
 import logging
+import re
 from fastapi import APIRouter, Request
 from backend.routes.redis.schemas import CreateChatRequest, AddMessageRequest
+from backend.utils.youtube import VIDEO_ID_REGEX
 from backend.services.redis import redis_memory, clean_username
 
 logger = logging.getLogger(__name__)
@@ -65,27 +67,37 @@ def save_message_turn(chat_id: str, req: AddMessageRequest):
 def delete_chat_session(chat_id: str, request: Request, video_id: str = "", username: str = "default"):
     """Delete a chat session, its messages, and its LangGraph checkpointer state from Redis."""
     redis_memory.delete_session(video_id, chat_id, username=username)
+    # The LangGraph thread_id is only well-defined for a validated video id;
+    # building it from anything else would orphan the checkpointer state.
     clean_user = clean_username(username)
-    thread_id = f"{clean_user}_{video_id}_{chat_id}"
-    checkpointer = getattr(request.app.state, "checkpointer", None)
-    if not checkpointer:
-        try:
-            from backend.core.checkpointer import get_redis_checkpointer
-            checkpointer = get_redis_checkpointer()
-            request.app.state.checkpointer = checkpointer
-        except Exception as e:
-            logger.warning(f"Could not load checkpointer: {e}")
-    if checkpointer and hasattr(checkpointer, "delete_thread"):
-        try:
-            checkpointer.delete_thread(thread_id)
-        except Exception as e:
-            logger.warning(f"Failed to delete checkpointer thread {thread_id}: {e}")
+    if video_id and re.fullmatch(VIDEO_ID_REGEX, video_id):
+        thread_id = f"{clean_user}_{video_id}_{chat_id}"
+        checkpointer = getattr(request.app.state, "checkpointer", None)
+        if not checkpointer:
+            try:
+                from backend.core.checkpointer import get_redis_checkpointer
+
+                checkpointer = get_redis_checkpointer()
+                request.app.state.checkpointer = checkpointer
+            except Exception as e:
+                logger.warning(f"Could not load checkpointer: {e}")
+        if checkpointer and hasattr(checkpointer, "delete_thread"):
+            try:
+                checkpointer.delete_thread(thread_id)
+            except Exception as e:
+                logger.warning(f"Failed to delete checkpointer thread {thread_id}: {e}")
     return {"status": "deleted", "chat_id": chat_id}
 
 
 @router.delete("/api/chats")
 def clear_all_chats(video_id: str = "", username: str = "default"):
-    """Clear all chat sessions for a video and user from Redis."""
+    """Clear all chat sessions for a video and user, or for the whole user when video_id is empty."""
     if video_id:
         redis_memory.clear_video_sessions(video_id, username=username)
+    else:
+        for session in redis_memory.list_all_user_sessions(username=username):
+            chat = session.get("chat_id")
+            vid = session.get("video_id")
+            if chat and vid:
+                redis_memory.delete_session(vid, chat, username=username)
     return {"status": "cleared", "video_id": video_id}

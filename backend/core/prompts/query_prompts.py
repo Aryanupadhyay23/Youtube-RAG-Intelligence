@@ -1,20 +1,27 @@
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from pydantic import BaseModel, Field
 
+
 class RewriteResult(BaseModel):
     standalone_query: str = Field(description="The rewritten standalone query")
     needs_rewrite: bool = Field(description="Whether the query actually needed rewriting")
 
+
 class CorrectResult(BaseModel):
     corrected_query: str = Field(description="The new, corrected search query")
 
+
 # 1. Query Rewrite Prompt
-REWRITE_PROMPT = ChatPromptTemplate.from_messages([
-    ("system", """ROLE
+REWRITE_PROMPT = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            """ROLE
 You are a query optimization assistant for a YouTube RAG system.
 
 TASK
 Convert a conversational/follow-up question into a standalone retrieval query.
+Decide whether rewriting is actually necessary: set needs_rewrite to true only when the question depends on earlier conversation turns (e.g. pronouns, implicit references, omitted subjects). If the question is already self-contained, set needs_rewrite to false and return it unchanged.
 
 RULES
 - Preserve the user's actual intent.
@@ -26,14 +33,21 @@ RULES
 - Preserve important technical terminology.
 - Optimize for retrieval, not natural conversation.
 - If the question is already standalone (e.g. "What is RAG?"), return it unchanged.
-"""),
-    MessagesPlaceholder("chat_history"),
-    ("user", "{question}")
-])
+- Set needs_rewrite to true only when the question depends on earlier turns.
+- Set needs_rewrite to false whenever standalone_query is the original question unchanged.
+""",
+        ),
+        MessagesPlaceholder("chat_history"),
+        ("user", "{question}"),
+    ]
+)
 
 # 2. Corrective Query Prompt
-CORRECTIVE_PROMPT = ChatPromptTemplate.from_messages([
-    ("system", """ROLE
+CORRECTIVE_PROMPT = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            """ROLE
 You are a search correction assistant.
 
 TASK
@@ -53,7 +67,9 @@ RULES
 - Do not add information from outside the provided conversation.
 - Keep the corrected query concise.
 - DO NOT answer the user's question, only improve the search query.
-"""),
-    MessagesPlaceholder("chat_history"),
-    ("user", "Rewrite search query for: {original_query}")
-])
+""",
+        ),
+        MessagesPlaceholder("chat_history"),
+        ("user", "Rewrite search query for: {original_query}"),
+    ]
+)

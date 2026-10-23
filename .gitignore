@@ -17,6 +17,10 @@ venv.bak/
 .env.*
 !.env.example
 .streamlit/secrets.toml
+*.pem
+*.key
+*.p12
+*.pfx
 
 # Distribution / packaging
 build/
@@ -27,9 +31,12 @@ dist/
 # Testing, Linting & Coverage
 .pytest_cache/
 .ruff_cache/
-.coverage
-htmlcov/
 .mypy_cache/
+.pyright/
+.hypothesis/
+.coverage
+coverage.xml
+htmlcov/
 
 # IDEs and Editors
 .vscode/
@@ -42,6 +49,11 @@ htmlcov/
 .DS_Store
 Thumbs.db
 ehthumbs.db
+
+# Temporary / backup files
+*.tmp
+*.bak
+*.orig
 
 # Databases & Local Vector Stores
 *.sqlite
@@ -59,3 +71,4 @@ data/
 .cache/
 scratch/
 instructions.txt
+interview.txt

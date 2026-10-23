@@ -128,12 +128,14 @@ Youtube-RAG-Intelligence/
 │       ├── install_dependencies.sh <- Prepares EC2 Docker host environment
 │       ├── start_docker.sh         <- Pulls container from ECR and launches
 │       └── stop_docker.sh          <- Stops running deployment containers
-├── tests/                        <- Automated unit test suite (5 test files, 11 tests)
+├── tests/                        <- Automated unit test suite (7 test modules, 24 tests)
 │   ├── test_chunking.py          <- Text chunking & boundary tests
+│   ├── test_chat_release.py      <- Chat cache reference-release tests
 │   ├── test_redis_memory.py      <- Upstash Redis persistence & fallback tests
 │   ├── test_retrieval.py         <- Hybrid search & RRF fusion tests
+│   ├── test_supadata.py          <- Transcript key rotation & fallback tests
 │   ├── test_timestamp.py         <- Timestamp formatting and conversion tests
-│   └── test_youtube.py           <- YouTube URL and video ID validation tests
+│   └── test_youtube.py           <- YouTube URL, ID & schema validation tests
 ├── backend/
 │   ├── main.py                   <- FastAPI application entrypoint & lifespan events
 │   ├── config.py                 <- Configuration loader, IPv4 preference & key pools
@@ -179,11 +181,12 @@ Youtube-RAG-Intelligence/
 │   │   │   └── tavily.py         <- Tavily search client
 │   │   └── youtube/              <- YouTube utilities
 │   │       ├── metadata.py       <- Video oEmbed metadata extractor
-│   │       └── parser.py         <- URL and video ID parser
+│   │       └── parser.py         <- Re-exports the shared URL/ID parser
 │   └── utils/
 │       ├── constants.py          <- Memory windows and default parameters
 │       ├── logger.py             <- Datewise Markdown logging utility
-│       └── timestamp.py          <- Timestamp conversion helpers
+│       ├── timestamp.py          <- Timestamp conversion helpers
+│       └── youtube.py            <- Shared video ID regex & URL parser
 └── frontend/
     ├── app.py                    <- Streamlit UI entrypoint
     ├── assets/
@@ -206,7 +209,7 @@ Youtube-RAG-Intelligence/
         ├── constants.py          <- UI configuration and limits
         ├── session.py            <- Streamlit session state management
         ├── timestamp.py          <- Timestamp display utilities
-        └── youtube.py            <- Video URL and ID validators
+        └── youtube.py            <- Re-exports the shared URL/ID parser
 ```
 
 ---
@@ -401,4 +404,4 @@ The automated deployment pipeline in `.github/workflows/deploy.yml`:
 
 ## License
 
-This project is licensed under the **MIT License**.
+This is a personal/learning project. No license file is currently included; add one (for example, MIT) if you plan to distribute the code.

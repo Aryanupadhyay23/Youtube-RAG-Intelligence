@@ -14,6 +14,7 @@ def create_timestamp_aware_chunks(video_id: str, transcript_segments: list) -> l
     documents = []
     current_segments = []
     current_chars = 0
+    overlap_count = 0  # Segments currently in the buffer that came from the previous chunk's overlap tail
     target_limit = CHUNK_SIZE * 4  # Target chunk size in characters (~1000 tokens)
     overlap_limit = CHUNK_OVERLAP * 4
 
@@ -51,20 +52,20 @@ def create_timestamp_aware_chunks(video_id: str, transcript_segments: list) -> l
 
             current_segments = overlap_segments
             current_chars = overlap_chars
+            overlap_count = len(overlap_segments)
 
-    # Flush remainder if it contains new content beyond the overlap
-    if current_segments:
-        if not documents or len(current_segments) > 1:
-            chunk_text = " ".join(s["text"].strip() for s in current_segments)
-            documents.append(
-                Document(
-                    page_content=chunk_text,
-                    metadata={
-                        "video_id": video_id,
-                        "start_time": current_segments[0]["start"],
-                        "end_time": current_segments[-1]["start"] + current_segments[-1]["duration"],
-                    },
-                )
+    # Flush remainder only if it contains new content beyond the overlap tail
+    if current_segments and (not documents or len(current_segments) > overlap_count):
+        chunk_text = " ".join(s["text"].strip() for s in current_segments)
+        documents.append(
+            Document(
+                page_content=chunk_text,
+                metadata={
+                    "video_id": video_id,
+                    "start_time": current_segments[0]["start"],
+                    "end_time": current_segments[-1]["start"] + current_segments[-1]["duration"],
+                },
             )
+        )
 
     return documents

@@ -8,11 +8,16 @@
 Dockerfile
 deploy/
 appspec.yml
+pyproject.toml
 
 # Environment variables & secrets
 .env
 .env.*
 .streamlit/secrets.toml
+*.pem
+*.key
+*.p12
+*.pfx
 
 # Virtual environments
 .venv/
@@ -33,15 +38,23 @@ dist/
 tests/
 .pytest_cache/
 .ruff_cache/
-.coverage
-htmlcov/
 .mypy_cache/
+.pyright/
+.hypothesis/
+.coverage
+coverage.xml
+htmlcov/
 
 # IDEs & OS files
 .vscode/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Temporary / backup files
+*.tmp
+*.bak
+*.orig
 
 # Logs, Databases & Data directories
 logs/

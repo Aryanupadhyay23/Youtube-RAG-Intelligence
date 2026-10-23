@@ -3,6 +3,7 @@ import logging
 import threading
 from typing import Optional, Dict, Any
 from collections import OrderedDict
+import asyncio
 
 from backend.config import MAX_ACTIVE_VIDEOS, VIDEO_INACTIVITY_TTL_MINUTES
 from backend.core.ingestion.vectorstore import delete_video_collection
@@ -24,6 +25,29 @@ class EphemeralVideoStoreCache:
         self._last_accessed: Dict[str, float] = {}
         self._ref_counts: Dict[str, int] = {}
         self._lock = threading.Lock()
+        self._init_lock_guard = threading.Lock()
+        self._init_locks: Dict[str, asyncio.Lock] = {}
+        self._init_lock_users: Dict[str, int] = {}
+
+    def acquire_init_lock(self, video_id: str) -> asyncio.Lock:
+        """Get a shared per-video async lock and register an active waiter/owner."""
+        with self._init_lock_guard:
+            lock = self._init_locks.get(video_id)
+            if lock is None:
+                lock = asyncio.Lock()
+                self._init_locks[video_id] = lock
+            self._init_lock_users[video_id] = self._init_lock_users.get(video_id, 0) + 1
+            return lock
+
+    def release_init_lock(self, video_id: str) -> None:
+        """Drop a per-video lock after its owner and all waiters have left."""
+        with self._init_lock_guard:
+            users = self._init_lock_users.get(video_id, 0) - 1
+            if users <= 0:
+                self._init_lock_users.pop(video_id, None)
+                self._init_locks.pop(video_id, None)
+            else:
+                self._init_lock_users[video_id] = users
 
     def get(self, video_id: str) -> Optional[Dict[str, Any]]:
         """Retrieve cached store entry, updating LRU and access timestamp."""
@@ -54,31 +78,50 @@ class EphemeralVideoStoreCache:
                 return
 
             while len(self._stores) >= self.max_videos:
-                evicted = False
+                evictable_id = None
                 for candidate_id in list(self._stores.keys()):
                     if self._ref_counts.get(candidate_id, 0) == 0:
-                        self._evict_locked(candidate_id)
-                        evicted = True
+                        evictable_id = candidate_id
                         break
-                if not evicted:
-                    oldest_id = next(iter(self._stores))
-                    self._evict_locked(oldest_id)
+                if evictable_id is not None:
+                    self._evict_locked(evictable_id)
+                else:
+                    # Every cached video is shielded by an active stream. Never evict
+                    # a live vector store out from under a stream; allow temporary
+                    # over-capacity instead.
+                    logger.warning(
+                        f"All {len(self._stores)} cached videos are in active use; "
+                        f"allowing temporary over-capacity for '{video_id}'."
+                    )
+                    break
 
             self._stores[video_id] = entry
             self._last_accessed[video_id] = time.time()
             self._ref_counts[video_id] = 0
-            logger.info(f"Video '{video_id}' stored in ephemeral RAM. (Active count: {len(self._stores)}/{self.max_videos})")
+            logger.info(
+                f"Video '{video_id}' stored in ephemeral RAM. (Active count: {len(self._stores)}/{self.max_videos})"
+            )
 
     def acquire(self, video_id: str):
         """Increment in-flight reference count to shield video from eviction during streaming."""
         with self._lock:
+            if video_id not in self._stores:
+                return
             self._ref_counts[video_id] = self._ref_counts.get(video_id, 0) + 1
             self._last_accessed[video_id] = time.time()
 
     def release(self, video_id: str):
-        """Decrement reference count after stream finishes."""
+        """Decrement reference count after stream finishes.
+
+        No-ops for videos no longer present in the cache so that releases for
+        evicted ids do not create ghost bookkeeping entries.
+        """
         with self._lock:
-            count = self._ref_counts.get(video_id, 1) - 1
+            if video_id not in self._stores:
+                self._ref_counts.pop(video_id, None)
+                self._last_accessed.pop(video_id, None)
+                return
+            count = self._ref_counts.get(video_id, 0) - 1
             self._ref_counts[video_id] = max(0, count)
             self._last_accessed[video_id] = time.time()
 
@@ -106,6 +149,12 @@ class EphemeralVideoStoreCache:
         evicted_count = 0
         with self._lock:
             for video_id, last_time in list(self._last_accessed.items()):
+                if video_id not in self._stores:
+                    # Ghost bookkeeping entry left behind by an evicted video.
+                    if now - last_time > self.ttl_seconds:
+                        self._last_accessed.pop(video_id, None)
+                        self._ref_counts.pop(video_id, None)
+                    continue
                 if self._ref_counts.get(video_id, 0) > 0:
                     continue
                 if now - last_time > self.ttl_seconds:

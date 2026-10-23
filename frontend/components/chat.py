@@ -1,6 +1,6 @@
 import streamlit as st
 from frontend.services.api import stream_chat, initialize_video, API_BASE_URL
-from frontend.services.chat_storage import save_current_chat, clear_current_chat
+from frontend.services.chat_storage import save_chat_messages, clear_current_chat
 from frontend.utils.timestamp import linkify_timestamps
 
 
@@ -24,18 +24,34 @@ def render_chat_ui():
         with st.chat_message("user", avatar="👤"):
             st.markdown(user_question)
 
+        chat_id = st.session_state.get("current_chat_id", "default_chat")
+        if not video_id:
+            st.error("⚠️ No video loaded. Please load a video first.")
+            return
+
         with st.chat_message("assistant", avatar="🤖"):
             status_placeholder = st.empty()
             response_box = st.empty()
             full_response = ""
+            has_error = False
+            turn_committed = False
+
+            def commit_response():
+                """Persist the full or partial streamed answer to the chat that started it."""
+                nonlocal turn_committed
+                if turn_committed or not full_response:
+                    return
+                turn_committed = True
+
+                updated_history = list(chat_history)
+                updated_history.append({"user": user_question, "ai": full_response})
+                save_chat_messages(chat_id, updated_history)
+
+                # Only rebind the visible history if the user is still on this chat.
+                if st.session_state.get("current_chat_id") == chat_id:
+                    st.session_state.chat_history = updated_history
 
             try:
-                chat_id = st.session_state.get("current_chat_id", "default_chat")
-                if not video_id:
-                    st.error("⚠️ No video loaded. Please load a video first.")
-                    return
-
-                has_error = False
 
                 def stream_with_retry():
                     for attempt in range(2):
@@ -48,7 +64,7 @@ def render_chat_ui():
                             username=st.session_state.get("username", "default"),
                         ):
                             val_str = str(event.get("value", "")).lower()
-                            if event["type"] == "error" and ("not initialized" in val_str or "not found" in val_str) and attempt == 0:
+                            if event["type"] == "error" and "not initialized" in val_str and attempt == 0:
                                 encountered_eviction = True
                                 break
                             yield event
@@ -56,9 +72,7 @@ def render_chat_ui():
                         if encountered_eviction:
                             status_placeholder.caption("🔄 Session expired. Re-initializing video...")
                             try:
-                                segments = st.session_state.get("transcript_segments", [])
-                                text = st.session_state.get("transcript_text", "")
-                                initialize_video(video_id=video_id, transcript_segments=segments, transcript_text=text)
+                                initialize_video(video_id=video_id)
                             except Exception as reinit_err:
                                 yield {"type": "error", "value": f"Re-initialization failed: {reinit_err}"}
                                 break
@@ -99,22 +113,19 @@ def render_chat_ui():
                             st.error(f"❌ {error_val}")
 
                 if full_response:
-                    formatted_final = linkify_timestamps(full_response, video_id)
-                    response_box.markdown(formatted_final)
+                    response_box.markdown(linkify_timestamps(full_response, video_id))
                     status_placeholder.empty()
-
-                    # Save turn and refresh cleanly
-                    chat_history.append({"user": user_question, "ai": full_response})
-                    st.session_state.chat_history = chat_history
-                    save_current_chat(chat_history)
-                    st.rerun()
-
                 elif not has_error:
                     response_box.markdown("*No response was generated. Please try again.*")
 
             except Exception as e:
-                error_str = str(e)
-                st.error(f"❌ Error: {error_str}")
+                st.error(f"❌ Error: {str(e)}")
+            finally:
+                # Persist partial output if the stream was interrupted after at least one token.
+                commit_response()
+
+            if turn_committed:
+                st.rerun()
 
     # Compact chat actions at the very bottom
     if chat_history:
@@ -126,8 +137,7 @@ def render_chat_ui():
                 st.rerun()
         with col_exp:
             export_data = "\n".join(
-                f"Turn {i}\n\nYou: {t['user']}\n\nAI: {t['ai']}\n"
-                for i, t in enumerate(chat_history, 1)
+                f"Turn {i}\n\nYou: {t['user']}\n\nAI: {t['ai']}\n" for i, t in enumerate(chat_history, 1)
             )
             st.download_button(
                 label="⬇️ Export Chat (.txt)",

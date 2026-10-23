@@ -1,8 +1,10 @@
 import json
 import asyncio
 import logging
+import threading
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
+from starlette.background import BackgroundTask
 
 from backend.routes.chat.schemas import ChatRequest
 from backend.core.llm import load_llm
@@ -18,12 +20,15 @@ def _ensure_app_state(request: Request):
     app_state = request.app.state
     if not hasattr(app_state, "video_stores") or app_state.video_stores is None:
         from backend.core.ingestion import EphemeralVideoStoreCache
+
         app_state.video_stores = EphemeralVideoStoreCache()
     if not hasattr(app_state, "checkpointer") or app_state.checkpointer is None:
         from backend.core.checkpointer import get_redis_checkpointer
+
         app_state.checkpointer = get_redis_checkpointer()
     if not hasattr(app_state, "rag_graph") or app_state.rag_graph is None:
         from backend.core.workflow.graph import build_langgraph
+
         app_state.rag_graph = build_langgraph(checkpointer=app_state.checkpointer)
     return app_state
 
@@ -34,9 +39,23 @@ async def chat_stream(req: ChatRequest, request: Request):
     app_state = _ensure_app_state(request)
     stores = app_state.video_stores.get_and_acquire(req.video_id)
     if not stores:
+
         async def not_initialized_stream():
             yield f"event: error\ndata: {json.dumps({'error': 'Video not initialized. Call /init first.'})}\n\n"
+
         return StreamingResponse(not_initialized_stream(), media_type="text/event-stream")
+
+    release_lock = threading.Lock()
+    released = False
+
+    def release():
+        """Release the cache reference exactly once, from either the generator or the response background."""
+        nonlocal released
+        with release_lock:
+            if released:
+                return
+            released = True
+        app_state.video_stores.release(req.video_id)
 
     try:
         clean_user = clean_username(req.username)
@@ -65,12 +84,14 @@ async def chat_stream(req: ChatRequest, request: Request):
 
         # If first turn in checkpointer, hydrate initial turns from Redis
         if not existing_tuple:
-            historical_messages = req.chat_history or (
-                await asyncio.to_thread(redis_memory.get_messages, req.chat_id, limit=MEMORY_WINDOW) if req.chat_id else []
+            historical_messages = [turn.model_dump() for turn in req.chat_history] or (
+                await asyncio.to_thread(redis_memory.get_messages, req.chat_id, limit=MEMORY_WINDOW)
+                if req.chat_id
+                else []
             )
             inputs["chat_history"] = historical_messages
     except Exception:
-        app_state.video_stores.release(req.video_id)
+        release()
         raise
 
     async def event_generator():
@@ -82,8 +103,12 @@ async def chat_stream(req: ChatRequest, request: Request):
 
                 # Stream graph node transitions
                 if kind == "on_chain_start" and name in [
-                    "rewrite_query", "hybrid_retrieve", "evaluate_retrieval",
-                    "correct_query", "web_search", "generate_answer"
+                    "rewrite_query",
+                    "hybrid_retrieve",
+                    "evaluate_retrieval",
+                    "correct_query",
+                    "web_search",
+                    "generate_answer",
                 ]:
                     yield f"event: status\ndata: {json.dumps({'message': f'Starting node: {name}'})}\n\n"
 
@@ -98,13 +123,6 @@ async def chat_stream(req: ChatRequest, request: Request):
                     if chunk:
                         full_answer += chunk
                         yield f"event: token\ndata: {json.dumps({'token': chunk})}\n\n"
-
-            # Persist updated LangGraph checkpoint to Redis
-            if hasattr(app_state.checkpointer, "sync_to_redis"):
-                try:
-                    await asyncio.to_thread(app_state.checkpointer.sync_to_redis, thread_id)
-                except Exception as cp_err:
-                    logger.warning(f"Failed to sync LangGraph checkpoint to Redis: {cp_err}")
 
             # Auto-persist conversational turn to Upstash Redis Memory (for UI sidebar list)
             if full_answer:
@@ -123,9 +141,15 @@ async def chat_stream(req: ChatRequest, request: Request):
             yield "event: end\ndata: {}\n\n"
         except Exception as e:
             logger.error(f"Streaming error: {e}", exc_info=True)
-            err_msg = str(e).strip() if str(e).strip() else f"{e.__class__.__name__}: An error occurred during processing."
+            err_msg = (
+                str(e).strip() if str(e).strip() else f"{e.__class__.__name__}: An error occurred during processing."
+            )
             yield f"event: error\ndata: {json.dumps({'error': err_msg})}\n\n"
         finally:
-            app_state.video_stores.release(req.video_id)
+            release()
 
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        background=BackgroundTask(release),
+    )

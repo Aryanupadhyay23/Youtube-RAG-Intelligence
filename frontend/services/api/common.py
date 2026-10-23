@@ -40,3 +40,6 @@ def _iter_sse(response: requests.Response) -> Generator[Dict[str, str], None, No
                 yield {"type": "token", "value": data.get("token", "")}
             elif event_type == "error":
                 yield {"type": "error", "value": data.get("error", "Unknown error")}
+            # The event type applies only to the event that follows it —
+            # reset it so untyped data lines are never misattributed.
+            event_type = None

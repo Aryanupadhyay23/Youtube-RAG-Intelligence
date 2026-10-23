@@ -45,9 +45,9 @@ render_sidebar()
 
 # Main Content View
 if st.session_state.get("video_id") and st.session_state.get("transcript_text"):
-    metadata = st.session_state.get("metadata", {})
+    metadata = st.session_state.get("metadata") or {}
     vid_id = st.session_state.video_id
-    segments = st.session_state.get("transcript_segments", [])
+    segments = st.session_state.get("transcript_segments") or []
     words = len(st.session_state.transcript_text.split())
 
     # Backend status badge (compact, inline using Tailwind)
@@ -89,7 +89,13 @@ if st.session_state.get("video_id") and st.session_state.get("transcript_text"):
         st.markdown(card_html, unsafe_allow_html=True)
 
     with col_header_switch:
-        if st.button("🔄 Switch Video", key="top_switch_video", type="secondary", use_container_width=True, help="Clear active video and load a new YouTube video link"):
+        if st.button(
+            "🔄 Switch Video",
+            key="top_switch_video",
+            type="secondary",
+            use_container_width=True,
+            help="Clear active video and load a new YouTube video link",
+        ):
             reset_video_state()
             st.session_state.pop("main_url_field", None)
             st.rerun()

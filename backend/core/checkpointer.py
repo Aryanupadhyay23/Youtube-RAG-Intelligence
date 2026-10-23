@@ -48,8 +48,9 @@ class AsyncUpstashRedisSaver(UpstashRedisSaver):
         config: RunnableConfig,
         writes: Sequence[Tuple[str, Any]],
         task_id: str,
+        task_path: str = "",
     ) -> None:
-        return await asyncio.to_thread(self.put_writes, config, writes, task_id)
+        return await asyncio.to_thread(self.put_writes, config, writes, task_id, task_path)
 
     async def alist(
         self,
@@ -87,7 +88,6 @@ def get_redis_checkpointer(
                 token=rest_token,
                 ttl=ttl,
             )
-            saver.__class__ = AsyncUpstashRedisSaver
             logger.info("Initialized official LangGraph AsyncUpstashRedisSaver checkpointer.")
             return saver
         except Exception as e:
@@ -101,7 +101,6 @@ def get_redis_checkpointer(
     # Try from_env() if configured via environment variables
     try:
         saver = AsyncUpstashRedisSaver.from_env(ttl=ttl)
-        saver.__class__ = AsyncUpstashRedisSaver
         logger.info("Initialized official LangGraph AsyncUpstashRedisSaver from environment.")
         return saver
     except Exception:

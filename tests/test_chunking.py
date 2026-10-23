@@ -3,10 +3,7 @@ from backend.core.ingestion import create_timestamp_aware_chunks
 
 
 def _segments(count, chars=40):
-    return [
-        {"text": "x" * chars, "start": float(i), "duration": 1.0}
-        for i in range(count)
-    ]
+    return [{"text": "x" * chars, "start": float(i), "duration": 1.0} for i in range(count)]
 
 
 class TestChunking(unittest.TestCase):

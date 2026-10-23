@@ -29,9 +29,7 @@ class TestRetrieval(unittest.TestCase):
 
         loop = asyncio.new_event_loop()
         try:
-            results = loop.run_until_complete(
-                hybrid_retrieve("test", vector, bm25, final_k=5)
-            )
+            results = loop.run_until_complete(hybrid_retrieve("test", vector, bm25, final_k=5))
             self.assertEqual(len(results), 2)
             self.assertEqual(results[0].page_content, "Apple banana")
         finally:

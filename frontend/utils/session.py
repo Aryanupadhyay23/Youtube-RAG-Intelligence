@@ -1,16 +1,20 @@
 import socket
 import streamlit as st
 
+
 # Prioritize IPv4 addresses during DNS resolution to avoid 20-45s IPv6 SYN timeouts on Windows/cloud
 def _enable_ipv4_preference():
     orig_getaddrinfo = socket.getaddrinfo
+
     def ipv4_preferred_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
         try:
             res = orig_getaddrinfo(host, port, family, type, proto, flags)
             return sorted(res, key=lambda x: 0 if x[0] == socket.AF_INET else 1)
         except Exception:
             return orig_getaddrinfo(host, port, family, type, proto, flags)
+
     socket.getaddrinfo = ipv4_preferred_getaddrinfo
+
 
 _enable_ipv4_preference()
 
@@ -31,7 +35,8 @@ def initialize_session():
     """Ensure all required session state variables exist with safe defaults."""
     for key, value in SESSION_DEFAULTS.items():
         if key not in st.session_state:
-            st.session_state[key] = value
+            # Copy mutable defaults so sessions never share the same list/dict object.
+            st.session_state[key] = value.copy() if isinstance(value, (list, dict)) else value
 
 
 def reset_video_state():
@@ -50,5 +55,3 @@ def reset_video_state():
     st.session_state.transcript_display_limit = 60
     st.session_state.player_start_time = 0
     st.session_state._memory_synced_video = None
-    st.session_state.prefill_url = ""
-

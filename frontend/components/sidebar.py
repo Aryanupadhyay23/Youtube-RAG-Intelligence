@@ -1,4 +1,5 @@
 import html
+from datetime import datetime
 import streamlit as st
 from frontend.utils.constants import APP_TITLE
 from frontend.services.chat_storage import (
@@ -33,19 +34,19 @@ def render_sidebar():
         # ── User Account / Memory Profile ─────────────────────────────────────
         current_user = get_current_username()
         safe_user = html.escape(str(current_user))
-        is_default = (current_user == "default")
+        is_default = current_user == "default"
 
         st.markdown(
             f"""
-            <div style="padding: 12px; border-radius: 12px; background: rgba(15, 23, 42, 0.7); border: 1px solid {'rgba(59, 130, 246, 0.3)' if is_default else 'rgba(16, 185, 129, 0.3)'}; margin-bottom: 0.75rem;">
+            <div style="padding: 12px; border-radius: 12px; background: rgba(15, 23, 42, 0.7); border: 1px solid {"rgba(59, 130, 246, 0.3)" if is_default else "rgba(16, 185, 129, 0.3)"}; margin-bottom: 0.75rem;">
                 <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
                     <span style="font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8;">User Profile</span>
-                    <span style="font-size: 0.75rem; font-weight: 600; padding: 2px 8px; border-radius: 9999px; background: {'rgba(59, 130, 246, 0.2)' if is_default else 'rgba(16, 185, 129, 0.2)'}; color: {'#60a5fa' if is_default else '#34d399'}; border: 1px solid {'rgba(59, 130, 246, 0.35)' if is_default else 'rgba(16, 185, 129, 0.35)'};">
-                        {'Default Mode' if is_default else f'@{safe_user}'}
+                    <span style="font-size: 0.75rem; font-weight: 600; padding: 2px 8px; border-radius: 9999px; background: {"rgba(59, 130, 246, 0.2)" if is_default else "rgba(16, 185, 129, 0.2)"}; color: {"#60a5fa" if is_default else "#34d399"}; border: 1px solid {"rgba(59, 130, 246, 0.35)" if is_default else "rgba(16, 185, 129, 0.35)"};">
+                        {"Default Mode" if is_default else f"@{safe_user}"}
                     </span>
                 </div>
                 <p style="font-size: 0.78rem; color: #94a3b8; line-height: 1.4; margin: 0 0 8px 0;">
-                    {'Conversations are saved automatically under <b>default</b>. Enter your username below to save and reload your personal chats.' if is_default else f'Active user: <b>@{safe_user}</b>. All conversations you conduct are automatically stored in memory.'}
+                    {"Conversations are saved automatically under <b>default</b>. Enter your username below to save and reload your personal chats." if is_default else f"Active user: <b>@{safe_user}</b>. All conversations you conduct are automatically stored in memory."}
                 </p>
             </div>
             """,
@@ -89,17 +90,14 @@ def render_sidebar():
 
         st.divider()
 
-        has_video = bool(
-            st.session_state.get("video_id")
-            and st.session_state.get("transcript_text")
-        )
+        has_video = bool(st.session_state.get("video_id") and st.session_state.get("transcript_text"))
 
         # ── Conversation Memories ─────────────────────────────────────────────
         st.markdown(
             f"""
             <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; padding: 6px 2px 8px 2px; display: flex; align-items: center; justify-content: space-between;">
                 <span>Conversation Memories</span>
-                <span style="font-size: 10px; color: #60a5fa; font-weight: 600;">{'@' + safe_user}</span>
+                <span style="font-size: 10px; color: #60a5fa; font-weight: 600;">{"@" + safe_user}</span>
             </div>
             """,
             unsafe_allow_html=True,
@@ -113,8 +111,11 @@ def render_sidebar():
                     create_new_chat()
                     st.rerun()
             with col_sw:
-                if st.button("🔄 Switch Video", use_container_width=True, help="Clear active video and load a new YouTube link"):
+                if st.button(
+                    "🔄 Switch Video", use_container_width=True, help="Clear active video and load a new YouTube link"
+                ):
                     from frontend.utils.session import reset_video_state
+
                     reset_video_state()
                     st.session_state.pop("main_url_field", None)
                     st.rerun()
@@ -162,10 +163,14 @@ def render_sidebar():
                     title = s.get("title", "Conversation")
                     display_title = (title[:32] + "…") if len(title) > 32 else title
                     updated = s.get("updated_at", "")
+                    if isinstance(updated, (int, float)):
+                        updated = datetime.fromtimestamp(updated).strftime("%b %d, %H:%M")
+                    else:
+                        updated = str(updated or "")
 
                     safe_display_title = html.escape(str(display_title))
                     safe_vid_id = html.escape(str(vid_id))
-                    safe_updated = html.escape(str(updated))
+                    safe_updated = html.escape(updated)
 
                     with st.container():
                         st.markdown(

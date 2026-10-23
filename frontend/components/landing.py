@@ -22,9 +22,6 @@ Paste any link to ask questions with exact timestamps, get instant summaries, or
     st.markdown(hero_html, unsafe_allow_html=True)
 
     # ── Search Input Box ──────────────────────────────────────────────────────
-    if st.session_state.get("prefill_url"):
-        st.session_state.main_url_field = st.session_state.pop("prefill_url")
-
     with st.form("youtube_input_form", clear_on_submit=False):
         col_input, col_submit = st.columns([5, 1])
         with col_input:
@@ -40,7 +37,6 @@ Paste any link to ask questions with exact timestamps, get instant summaries, or
         if submitted:
             if url_value and url_value.strip():
                 st.session_state.submitted_video_url = url_value.strip()
-                st.session_state.prefill_url = ""
                 st.rerun()
             else:
                 st.warning("⚠️ Please paste a valid YouTube video link first.")
@@ -130,4 +126,3 @@ Paste any link to ask questions with exact timestamps, get instant summaries, or
 </div>""",
             unsafe_allow_html=True,
         )
-

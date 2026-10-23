@@ -49,6 +49,9 @@ COPY --from=builder /opt/venv /opt/venv
 COPY --chown=appuser:appuser backend /app/backend
 COPY --chown=appuser:appuser frontend /app/frontend
 
+# Streamlit loads its config from the working directory (/app)
+COPY --chown=appuser:appuser frontend/.streamlit /app/.streamlit
+
 # Create and grant permissions for logs directory
 RUN mkdir -p /app/logs && chown -R appuser:appuser /app/logs && chmod 775 /app/logs
 
@@ -58,5 +61,11 @@ USER appuser
 # Streamlit UI container port
 EXPOSE 7860
 
-# Start FastAPI internally and Streamlit publicly
-CMD ["sh", "-c", "uvicorn backend.main:app --host 0.0.0.0 --port 8000 & exec streamlit run frontend/app.py --server.port=7860 --server.address=0.0.0.0 --server.fileWatcherType=none --browser.gatherUsageStats=false"]
+# Container health: backend /health endpoint is env-independent
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4)" || exit 1
+
+# Run both servers under a single supervisor shell: if either process dies the
+# container exits (and --restart unless-stopped brings it back) instead of
+# silently serving only one side.
+CMD ["bash", "-c", "uvicorn backend.main:app --host 0.0.0.0 --port 8000 & UVICORN_PID=$!; streamlit run frontend/app.py --server.port=7860 --server.address=0.0.0.0 --server.fileWatcherType=none --browser.gatherUsageStats=false & STREAMLIT_PID=$!; wait -n; EXIT_CODE=$?; echo 'A server process exited; stopping container.'; kill $UVICORN_PID $STREAMLIT_PID 2>/dev/null || true; exit $EXIT_CODE"]

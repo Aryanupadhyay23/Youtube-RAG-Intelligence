@@ -7,7 +7,6 @@ from frontend.services.api import (
 from frontend.services.chat_storage import (
     initialize_chat_state,
     save_current_chat,
-    format_chat_export,
 )
 
 __all__ = [
@@ -17,5 +16,4 @@ __all__ = [
     "request_summary",
     "initialize_chat_state",
     "save_current_chat",
-    "format_chat_export",
 ]

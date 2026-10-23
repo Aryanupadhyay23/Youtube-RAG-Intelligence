@@ -9,11 +9,13 @@ async def fallback_web_search(query: str) -> str:
     try:
         try:
             from langchain_tavily import TavilySearch
+
             tool = TavilySearch(max_results=3, tavily_api_key=TAVILY_API_KEY)
             response = await tool.ainvoke({"query": query})
             items = response.get("results", []) if isinstance(response, dict) else response
         except ImportError:
             from langchain_community.tools.tavily_search import TavilySearchResults
+
             tool = TavilySearchResults(max_results=3, tavily_api_key=TAVILY_API_KEY)
             items = await tool.ainvoke({"query": query})
 
@@ -22,7 +24,8 @@ async def fallback_web_search(query: str) -> str:
 
         formatted = [
             f"Source: {r.get('title', 'Web')} ({r.get('url', '')})\nContent: {r.get('content', '')}"
-            for r in items if isinstance(r, dict)
+            for r in items
+            if isinstance(r, dict)
         ]
         return "\n\n".join(formatted)
 

@@ -45,10 +45,12 @@ async def generate_summary_async(
         async with semaphore:
             try:
                 map_chain = CHUNK_SUMMARY_PROMPT | llm | StrOutputParser()
-                summary = await map_chain.ainvoke({
-                    "chunk": chunk,
-                    "timestamp": f"Section {idx + 1}/{len(chunks)}",
-                })
+                summary = await map_chain.ainvoke(
+                    {
+                        "chunk": chunk,
+                        "timestamp": f"Section {idx + 1}/{len(chunks)}",
+                    }
+                )
                 return idx, summary
             except Exception as e:
                 logger.warning(f"Failed to summarize chunk {idx + 1}: {e}")
@@ -109,24 +111,23 @@ async def generate_summary_stream(
     }
 
     semaphore = asyncio.Semaphore(max_concurrency)
-    completed_counter = 0
 
-    async def summarize_chunk_with_progress(idx: int, chunk: str) -> tuple[int, str]:
-        nonlocal completed_counter
+    async def summarize_chunk(idx: int, chunk: str) -> tuple[int, str]:
         async with semaphore:
             try:
                 map_chain = CHUNK_SUMMARY_PROMPT | llm | StrOutputParser()
-                summary = await map_chain.ainvoke({
-                    "chunk": chunk,
-                    "timestamp": f"Section {idx + 1}/{total_chunks}",
-                })
+                summary = await map_chain.ainvoke(
+                    {
+                        "chunk": chunk,
+                        "timestamp": f"Section {idx + 1}/{total_chunks}",
+                    }
+                )
             except Exception as e:
                 logger.warning(f"Chunk {idx + 1} summary failed: {e}")
                 summary = chunk[:500] + "..."
-            completed_counter += 1
             return idx, summary
 
-    tasks = [summarize_chunk_with_progress(idx, chunk) for idx, chunk in enumerate(chunks)]
+    tasks = [summarize_chunk(idx, chunk) for idx, chunk in enumerate(chunks)]
     results = await asyncio.gather(*tasks)
     results.sort(key=lambda x: x[0])
     partial_summaries = [r[1] for r in results]

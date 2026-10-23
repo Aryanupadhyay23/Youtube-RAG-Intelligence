@@ -3,6 +3,7 @@ from typing import TypedDict, List
 
 class RAGState(TypedDict):
     """LangGraph CRAG Agent State schema across conversation turns."""
+
     query: str
     rewritten_query: str
     chat_history: List[dict]

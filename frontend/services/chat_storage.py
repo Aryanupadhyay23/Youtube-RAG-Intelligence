@@ -56,27 +56,35 @@ def switch_chat(chat_id: str):
     st.session_state.chat_history = messages
 
 
+def save_chat_messages(chat_id: str, messages: list):
+    """Save message history for a specific chat session, even if it is no longer active."""
+    if not chat_id:
+        return
+
+    if "all_chats" not in st.session_state:
+        st.session_state.all_chats = {}
+
+    if chat_id not in st.session_state.all_chats:
+        st.session_state.all_chats[chat_id] = {
+            "title": "New Chat",
+            "messages": [],
+            "created_at": time.strftime("%H:%M"),
+        }
+
+    st.session_state.all_chats[chat_id]["messages"] = messages
+    if messages:
+        first_q = messages[0].get("user", "")
+        title = (first_q[:35] + "...") if len(first_q) > 35 else first_q
+        st.session_state.all_chats[chat_id]["title"] = title
+
+
 def save_current_chat(messages: list):
     """Save message history for current active chat in local session state."""
     current_chat_id = st.session_state.get("current_chat_id")
     if not current_chat_id:
         return
 
-    if "all_chats" not in st.session_state:
-        st.session_state.all_chats = {}
-
-    if current_chat_id not in st.session_state.all_chats:
-        st.session_state.all_chats[current_chat_id] = {
-            "title": "New Chat",
-            "messages": [],
-            "created_at": time.strftime("%H:%M"),
-        }
-
-    st.session_state.all_chats[current_chat_id]["messages"] = messages
-    if messages:
-        first_q = messages[0].get("user", "")
-        title = (first_q[:35] + "...") if len(first_q) > 35 else first_q
-        st.session_state.all_chats[current_chat_id]["title"] = title
+    save_chat_messages(current_chat_id, messages)
 
 
 def delete_chat(chat_id: str):
@@ -100,15 +108,6 @@ def delete_chat(chat_id: str):
             create_new_chat()
 
 
-def delete_current_chat():
-    """Delete current active chat session."""
-    current_chat_id = st.session_state.get("current_chat_id")
-    if current_chat_id:
-        delete_chat(current_chat_id)
-    else:
-        create_new_chat()
-
-
 def clear_current_chat():
     """Clear all messages and LangGraph checkpoint for current chat from session and backend Redis."""
     current_chat_id = st.session_state.get("current_chat_id")
@@ -116,6 +115,8 @@ def clear_current_chat():
     username = get_current_username()
     st.session_state.chat_history = []
     save_current_chat([])
+    if current_chat_id and current_chat_id in st.session_state.all_chats:
+        st.session_state.all_chats[current_chat_id]["title"] = "New Chat"
     if current_chat_id and video_id:
         delete_remote_chat(current_chat_id, video_id=video_id, username=username)
         create_remote_chat(video_id=video_id, chat_id=current_chat_id, title="New Chat", username=username)
@@ -199,11 +200,3 @@ def initialize_chat_state():
 
     if not st.session_state.get("current_chat_id"):
         create_new_chat()
-
-
-def format_chat_export(chat_history: list) -> str:
-    """Format chat history into clean text for export."""
-    lines = []
-    for idx, turn in enumerate(chat_history, 1):
-        lines.append(f"Turn {idx}\n\nYou: {turn['user']}\n\nAI: {turn['ai']}\n")
-    return "\n".join(lines)

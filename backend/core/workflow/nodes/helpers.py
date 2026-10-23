@@ -18,9 +18,7 @@ def format_docs_with_timestamps(docs) -> str:
         end_str = format_time(end_sec)
         vid_id = d.metadata.get("video_id", "")
         url = get_youtube_timestamp_url(vid_id, start_sec) if vid_id else ""
-        formatted.append(
-            f"Timestamp: [{start_str} - {end_str}] (Link: {url})\nContent: {d.page_content}"
-        )
+        formatted.append(f"Timestamp: [{start_str} - {end_str}] (Link: {url})\nContent: {d.page_content}")
     return "\n\n".join(formatted)
 
 
@@ -28,20 +26,19 @@ def format_chat_history(history: list) -> list:
     """Convert the last MEMORY_WINDOW turns to LangChain Human/AI messages."""
     messages = []
     for turn in history[-MEMORY_WINDOW:]:
-        messages.extend([
-            HumanMessage(content=turn["user"]),
-            AIMessage(content=turn["ai"]),
-        ])
+        messages.extend(
+            [
+                HumanMessage(content=turn["user"]),
+                AIMessage(content=turn["ai"]),
+            ]
+        )
     return messages
 
 
 async def rephrase_query(state: RAGState, prompt, output_schema, llm, **kwargs) -> dict:
     """Generic query rewriting logic with structured output fallback."""
     query = state["query"]
-    messages = prompt.format_messages(
-        chat_history=format_chat_history(state.get("chat_history", [])),
-        **kwargs
-    )
+    messages = prompt.format_messages(chat_history=format_chat_history(state.get("chat_history", [])), **kwargs)
 
     try:
         response = await llm.with_structured_output(output_schema, method="function_calling").ainvoke(messages)

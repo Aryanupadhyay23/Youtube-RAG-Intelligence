@@ -12,8 +12,9 @@ def render_summary_ui():
         return
 
     word_count = len(transcript_text.split())
-    st.info(f"📄 Video length: ~{word_count:,} words. Click below to generate a clear summary with key takeaways and major topics.")
-
+    st.info(
+        f"📄 Video length: ~{word_count:,} words. Click below to generate a clear summary with key takeaways and major topics."
+    )
 
     btn_label = "🔄 Regenerate Summary" if st.session_state.get("summary") else "✨ Generate Summary"
     if st.button(btn_label, type="primary"):

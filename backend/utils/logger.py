@@ -181,7 +181,8 @@ def get_datewise_logs_markdown(
     warning_count = 0
     info_count = 0
 
-    target_level = level_filter.upper().strip() if level_filter and level_filter != "ALL" else None
+    normalized_level = level_filter.upper().strip() if level_filter else ""
+    target_level = normalized_level if normalized_level and normalized_level != "ALL" else None
     search_lower = search_query.lower().strip() if search_query else None
 
     for block in blocks:
@@ -215,7 +216,7 @@ def get_datewise_logs_markdown(
         if target_level:
             filters_applied.append(f"Level: `{target_level}`")
         if search_query:
-            filters_applied.append(f"Search: `\"{search_query}\"`")
+            filters_applied.append(f'Search: `"{search_query}"`')
         header.append(f"*Filters Applied: {', '.join(filters_applied)} (Showing {len(filtered_blocks)} results)*\n")
 
     header.append("---\n")

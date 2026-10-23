@@ -24,11 +24,7 @@ def _mask_api_key(key: str) -> str:
 
 def _create_ollama_client(model_name: str, api_key: str, key_index: int, total_keys: int):
     """Instantiate a ChatOllama instance with Authorization header, context window limit, and failure logging."""
-    client_kwargs = (
-        {"headers": {"Authorization": f"Bearer {api_key}"}}
-        if api_key
-        else {}
-    )
+    client_kwargs = {"headers": {"Authorization": f"Bearer {api_key}"}} if api_key else {}
     model = ChatOllama(
         model=model_name,
         base_url=OLLAMA_HOST,
@@ -65,10 +61,7 @@ def _build_model_with_fallbacks(model_name: str):
     total_keys = len(keys)
     logger.info(f"Initialized Ollama model '{model_name}' with {total_keys} API key(s) for fallback support.")
 
-    models = [
-        _create_ollama_client(model_name, key, idx + 1, total_keys)
-        for idx, key in enumerate(keys)
-    ]
+    models = [_create_ollama_client(model_name, key, idx + 1, total_keys) for idx, key in enumerate(keys)]
 
     if len(models) == 1:
         return models[0]
@@ -86,4 +79,3 @@ def load_llm():
 def load_summary_llm():
     """Load ChatOllama for video summaries with multi-key fallback."""
     return _build_model_with_fallbacks(OLLAMA_SUMMARY_MODEL)
-

@@ -1,6 +1,5 @@
 from pydantic import BaseModel, Field
-
-VIDEO_ID_REGEX = r"^[A-Za-z0-9_-]{11}$"
+from backend.utils.youtube import VIDEO_ID_REGEX
 
 
 class InitRequest(BaseModel):

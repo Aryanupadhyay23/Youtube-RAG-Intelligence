@@ -1,6 +1,3 @@
-APP_TITLE = "YouTube RAG Intelligence"
-APP_CAPTION = "AI-Powered Chat, Summaries, and Transcript Explorer"
-
 # Conversation Memory
 MEMORY_WINDOW = 20
 
@@ -22,4 +19,3 @@ MAX_RETRIEVAL_ATTEMPTS = 2
 # Model Names
 EMBEDDING_MODEL = "models/gemini-embedding-2"
 LLM_TEMPERATURE = 0.3
-

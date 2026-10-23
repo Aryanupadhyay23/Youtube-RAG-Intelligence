@@ -30,10 +30,10 @@ env:
   # ─── MASTER CI/CD PERMISSION ─────────────────────────────────────────────
   # Set to "true" ONLY when you want GitHub Actions to run CI and deploy.
   # Set to "false" to pause/block automatic execution on git push.
-  EXECUTE_PIPELINE: "true"
+  EXECUTE_PIPELINE: "false"
 
   # ─── PLATFORM TOGGLES ────────────────────────────────────────────────────
-  ENABLE_AWS: "true"
+  ENABLE_AWS: "false"
 
   # ─── CLOUD CONFIGURATION ──────────────────────────────────────────────────
   AWS_REGION: ap-southeast-2
@@ -56,13 +56,13 @@ jobs:
         id: gatekeeper
         run: |
           # Evaluate master pipeline permission
-          if [ "${{ env.EXECUTE_PIPELINE }}" = "true" ] || [ "${{ inputs.execute_pipeline }}" = "true" ]; then
+          if [ "${{ env.EXECUTE_PIPELINE }}" = "true" ] && [ "${{ inputs.execute_pipeline }}" != "false" ]; then
             echo "authorized=true" >> $GITHUB_OUTPUT
             echo "Pipeline execution AUTHORIZED."
           else
             echo "authorized=false" >> $GITHUB_OUTPUT
-            echo "Pipeline execution BLOCKED (EXECUTE_PIPELINE is '${{ env.EXECUTE_PIPELINE }}')."
-            echo "Set EXECUTE_PIPELINE: 'true' in deploy.yml to enable."
+            echo "Pipeline execution BLOCKED (EXECUTE_PIPELINE is '${{ env.EXECUTE_PIPELINE }}', input.execute_pipeline is '${{ inputs.execute_pipeline }}')."
+            echo "Set EXECUTE_PIPELINE: 'true' in deploy.yml or pass input.execute_pipeline=true to enable."
           fi
 
           # Evaluate AWS target
@@ -173,8 +173,8 @@ jobs:
             -p 7860:7860 \
             app:${{ github.sha }}
 
-          # Poll /health endpoint for up to 30 seconds
-          for i in {1..15}; do
+          # Poll /health endpoint for up to 60 seconds (cold imports of chromadb/LangChain can be slow)
+          for i in {1..30}; do
             sleep 2
             if curl -sf http://localhost:8000/health | grep healthy; then
               echo "FastAPI container passed pre-deployment health check!"

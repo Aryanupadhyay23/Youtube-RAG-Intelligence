@@ -14,6 +14,7 @@ router = APIRouter(tags=["Summarization"])
 @router.post("/summary/stream")
 async def summarize_stream(req: SummaryRequest):
     """Stream smart summary generation progress events and final tokens via SSE."""
+
     async def event_generator():
         try:
             async for event in generate_summary_stream(req.transcript_text):

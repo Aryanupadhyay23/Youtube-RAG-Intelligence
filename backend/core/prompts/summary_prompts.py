@@ -1,7 +1,10 @@
 from langchain_core.prompts import ChatPromptTemplate
 
-CHUNK_SUMMARY_PROMPT = ChatPromptTemplate.from_messages([
-    ("system", """You are a transcription summarizer.
+CHUNK_SUMMARY_PROMPT = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            """You are a transcription summarizer.
 Your task is to create a concise factual summary of ONLY the provided transcript chunk.
 
 RULES:
@@ -9,17 +12,25 @@ RULES:
 - Preserve important technical concepts, names, terminology, numbers, and examples.
 - Remove filler and repetition.
 - Do not refer to the chunk as "this chunk".
-- Write a useful standalone summary."""),
-    ("human", """Transcript chunk:
+- Write a useful standalone summary.""",
+        ),
+        (
+            "human",
+            """Transcript chunk:
 {chunk}
 
 Timestamp: {timestamp}
 
-Please summarize this chunk.""")
-])
+Please summarize this chunk.""",
+        ),
+    ]
+)
 
-FINAL_SUMMARY_PROMPT = ChatPromptTemplate.from_messages([
-    ("system", """You are an expert video summarizer.
+FINAL_SUMMARY_PROMPT = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            """You are an expert video summarizer.
 Produce a complete, comprehensive video summary based ONLY on the provided section summaries.
 
 OUTPUT STRUCTURE:
@@ -44,10 +55,15 @@ RULES:
 - Preserve the video's logical progression.
 - Avoid repeating the same idea.
 - Prefer useful information over generic statements.
-- LANGUAGE: Generate the summary in the primary language of the video transcript (e.g., English, Hindi, Spanish), preserving native clarity."""),
-    ("human", """Here is the transcript content from the video:
+- LANGUAGE: Generate the summary in the primary language of the video transcript (e.g., English, Hindi, Spanish), preserving native clarity.""",
+        ),
+        (
+            "human",
+            """Here is the transcript content from the video:
 
 {section_summaries}
 
-Please generate the complete video summary following the output structure.""")
-])
+Please generate the complete video summary following the output structure.""",
+        ),
+    ]
+)

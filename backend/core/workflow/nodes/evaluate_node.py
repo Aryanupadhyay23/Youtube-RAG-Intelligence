@@ -19,9 +19,11 @@ async def evaluate_retrieval(state: RAGState, config: RunnableConfig) -> dict:
     combined_content = "\n\n---\n\n".join(d.page_content for d in docs[:3])
     messages = GRADER_PROMPT.format_messages(question=query, document=combined_content)
     try:
-        response = await config["configurable"]["llm"].with_structured_output(
-            GradeResult, method="function_calling"
-        ).ainvoke(messages)
+        response = (
+            await config["configurable"]["llm"]
+            .with_structured_output(GradeResult, method="function_calling")
+            .ainvoke(messages)
+        )
         is_rel = bool(getattr(response, "relevant", False))
         score = getattr(response, "score", None)
         if score is not None and score == 0:

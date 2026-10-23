@@ -32,8 +32,10 @@ fi
 ENV_ARGS=()
 if [ -n "${ENV_FILE}" ]; then
     echo "Using environment file: ${ENV_FILE}"
-    sed -i 's/\r$//' "${ENV_FILE}"
-    ENV_ARGS=(--env-file "${ENV_FILE}")
+    # Strip CR characters without mutating the operator's file
+    SANITIZED_ENV="/tmp/youtube-rag.env"
+    sed 's/\r$//' "${ENV_FILE}" > "${SANITIZED_ENV}"
+    ENV_ARGS=(--env-file "${SANITIZED_ENV}")
 fi
 
 echo "Stopping existing container if present..."
@@ -50,18 +52,24 @@ docker run -d \
     -p 8000:8000 \
     "${ENV_ARGS[@]}" \
     "${IMAGE_URI}" \
-    sh -c '
+    bash -c '
         uvicorn backend.main:app \
             --host 0.0.0.0 \
             --port 8000 \
             --root-path /youtube-rag-backend &
 
-        exec streamlit run frontend/app.py \
+        UVICORN_PID=$!
+        streamlit run frontend/app.py \
             --server.port=7860 \
             --server.address=0.0.0.0 \
             --server.baseUrlPath=youtube-rag \
             --server.fileWatcherType=none \
-            --browser.gatherUsageStats=false
+            --browser.gatherUsageStats=false &
+
+        STREAMLIT_PID=$!
+        trap "kill $UVICORN_PID $STREAMLIT_PID 2>/dev/null" EXIT
+        wait -n
+        exit $?
     '
 
 echo "YouTube RAG container started."

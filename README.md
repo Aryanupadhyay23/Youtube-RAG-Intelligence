@@ -1,407 +1,246 @@
 # YouTube RAG Intelligence
 
-A video intelligence platform that transforms any YouTube video into an interactive, grounded knowledge base. Built with **LangGraph (Corrective RAG - CRAG)**, **LangChain**, **Ollama (`gemma4:31b-cloud`)**, **Google Gemini embeddings**, **hybrid retrieval (in-memory ChromaDB + BM25 with Reciprocal Rank Fusion)**, and **Upstash Redis serverless checkpointing memory**.
+YouTube RAG Intelligence turns a YouTube video transcript into a searchable, conversational knowledge base. Paste a video URL to load its transcript, ask questions with timestamped citations, explore transcript segments, and generate a structured summary.
 
-Chat with YouTube videos in natural language, generate structured multi-part executive summaries, and inspect synchronized transcripts with timestamp navigation.
+The project has a Streamlit frontend and an asynchronous FastAPI backend. The backend uses LangGraph for corrective retrieval, Gemini embeddings with Chroma and BM25 for hybrid search, Ollama for answer and summary generation, Supadata for transcript extraction, optional Tavily web search, and optional Upstash Redis for conversation storage and graph checkpoints.
 
-> Transcripts in any language are automatically ingested and answered fluently in the user's preferred language with timestamp citations.
+## Features
 
----
+- Ingest video transcripts and metadata from a YouTube video ID.
+- Search transcript content with dense vector and BM25 retrieval fused using reciprocal rank fusion.
+- Answer questions through a LangGraph corrective RAG workflow, with timestamp citations and an optional Tavily fallback.
+- Generate long-form summaries through a map-reduce pipeline, with both streaming and non-streaming API endpoints.
+- Browse and search transcript segments in the UI, jump to timestamps, and export transcript text.
+- Manage user profiles and chat sessions; persist sessions and graph checkpoints in Upstash Redis when configured.
+- Cache active video indexes in process memory with configurable capacity and inactivity expiration.
 
-## Live Deployment (Active Monday to Friday, 9:00 AM to 5:00 PM)
-
-- **Frontend Application**: [https://aryan-projects.duckdns.org/youtube-rag](https://aryan-projects.duckdns.org/youtube-rag)
-- **Backend API (Swagger UI)**: [https://aryan-projects.duckdns.org/youtube-rag-backend/docs](https://aryan-projects.duckdns.org/youtube-rag-backend/docs)
-
----
-
-## Core Features
-
-- **Corrective RAG (CRAG) Agent Architecture**: Built upon a self-evaluating state graph in LangGraph that grades retrieved transcript segments, refines ambiguous queries through corrective reformulation loops, and falls back to Tavily web search when video context is insufficient.
-- **Serverless Conversational Memory & Checkpointer**: Multi-turn dialogue persistence powered by the official `langgraph-checkpoint-upstash-redis` checkpointer (`UpstashRedisSaver`) with fallback to in-memory checkpointer. State is tracked per user profile and session with a configurable sliding window (`MEMORY_WINDOW = 20`).
-- **Pre-Retrieval & Corrective Query Rewriting**:
-  - *Conversational De-referencing (`rewrite_query`)*: Automatically resolves pronouns and follow-up context into standalone retrieval queries.
-  - *Correction Loop (`correct_query`)*: Reformulates failed or ambiguous searches when initial retrieval fails quality checks.
-- **Hybrid Dense + Sparse Retrieval with RRF**: Combines semantic embeddings (Google Gemini via in-memory ChromaDB) and keyword frequency (BM25) fused with Reciprocal Rank Fusion (RRF, $k=60$) for top-tier recall and precision.
-- **Interactive Transcript Explorer**: Instant client-side search, synchronized video jumping upon clicking timestamps, and one-click plain text transcript exports.
-- **Long-Form Smart Summarizer**: Map-reduce summarization pipeline designed for multi-hour videos without token exhaustion, generating structured key takeaways, core topics, and actionable summaries.
-- **Timestamp Citations**: Every generated answer cites verifiable video timestamps (e.g., `[14:25]`) that directly control the embedded video player.
-- **Multi-Key Failover Resilience**:
-  - Automated 4-key rotation pool for transcript extraction (`Supadata`).
-  - Automated 3-key rotation pool for LLM inference (`Ollama Cloud`).
-- **User Profiles & Redis Session Management**: Create, switch, and manage user profiles (e.g., `@aryan`, `@default`), browse past video chat sessions stored in Upstash Redis, and download conversation histories.
-- **High-Performance Async Backend**: Fully asynchronous FastAPI backend streaming token-by-token responses and real-time agent execution states via Server-Sent Events (SSE).
-
----
-
-## Agent Workflow Architecture (LangGraph CRAG)
-
-The application executes a stateful Corrective RAG (CRAG) workflow implemented using LangGraph `StateGraph(RAGState)`:
+## Architecture
 
 ```mermaid
 flowchart TD
-    %% Entry Point
-    START([User Query + Session State]) --> REWRITE["rewrite_query\n(Resolve pronouns & conversational context)"]
-
-    %% Hybrid Retrieval
-    REWRITE --> RETRIEVE["hybrid_retrieve\n(Chroma Dense + BM25 Sparse via RRF)"]
-
-    %% Evaluation Node
-    RETRIEVE --> EVAL["evaluate_retrieval\n(LLM Grades Relevance: GOOD or POOR)"]
-
-    %% Conditional Routing Decision
-    EVAL --> ROUTE{"route_after_evaluation\n(Score & Attempt Check)"}
-
-    %% Routing Branches
-    ROUTE -->|"Score == GOOD"| GENERATE["generate_answer\n(Synthesize answer with [MM:SS] citations)"]
-    ROUTE -->|"Score == POOR & Attempts < 2"| CORRECT["correct_query\n(Analyze failure & reformulate query)"]
-    ROUTE -->|"Score == POOR & Attempts >= 2"| WEB["web_search\n(Tavily Search API Fallback)"]
-
-    %% Corrective Loop
-    CORRECT -->|"Increment Attempt"| RETRIEVE
-
-    %% Web Fallback to Generation
-    WEB --> GENERATE
-
-    %% State Persistence & Output
-    GENERATE --> MEMORY[("Upstash Redis Checkpointer\n& Memory Window Update")]
-    MEMORY --> FINISH([Stream Response & Citations to User])
-
-    %% Styling
-    classDef terminal fill:#0f172a,stroke:#38bdf8,stroke-width:2px,color:#ffffff;
-    classDef core fill:#1e293b,stroke:#60a5fa,stroke-width:2px,color:#ffffff;
-    classDef decision fill:#312e81,stroke:#818cf8,stroke-width:2px,color:#ffffff;
-    classDef action fill:#064e3b,stroke:#34d399,stroke-width:2px,color:#ffffff;
-    classDef storage fill:#451a03,stroke:#fb923c,stroke-width:2px,color:#ffffff;
-
-    class START,FINISH terminal;
-    class REWRITE,RETRIEVE,CORRECT,WEB core;
-    class EVAL,ROUTE decision;
-    class GENERATE action;
-    class MEMORY storage;
+    UI[Streamlit UI] -->|REST and SSE| API[FastAPI]
+    API --> INGEST[Supadata transcript + YouTube metadata]
+    INGEST --> INDEX[Gemini embeddings + Chroma]
+    INGEST --> BM25[BM25 index]
+    API --> GRAPH[LangGraph CRAG workflow]
+    INDEX --> GRAPH
+    BM25 --> GRAPH
+    GRAPH -->|optional fallback| TAVILY[Tavily Search]
+    GRAPH --> LLM[Ollama chat model]
+    API --> SUMMARY[Map-reduce summarizer]
+    SUMMARY --> LLM
+    API --> REDIS[Optional Upstash Redis]
 ```
 
-### Workflow Steps Breakdown
+For chat, the graph rewrites follow-up questions when needed, retrieves transcript passages using dense and lexical search, grades relevance, and attempts corrective retrieval before optionally using web search. It then streams the answer to the UI. Video indexes are ephemeral and held in the backend process; Redis is used for chat history and the LangGraph checkpointer when configured.
 
-1. **`rewrite_query`**: If chat history exists, the LLM reformulates the conversational query into an independent retrieval string using `REWRITE_PROMPT` and structured output. If no history exists, the query passes unchanged.
-2. **`hybrid_retrieve`**: Concurrently performs dense vector similarity search in in-memory ChromaDB and sparse keyword matching via BM25, combining results using Reciprocal Rank Fusion ($RRF\_K = 60$).
-3. **`evaluate_retrieval`**: Evaluates the top retrieved transcript chunks against the question using `GRADER_PROMPT` to grade information quality as `GOOD` or `POOR`.
-4. **`route_after_evaluation`**:
-   - If `GOOD` $\rightarrow$ proceed to `generate_answer`.
-   - If `POOR` and `retrieval_attempt < 2` $\rightarrow$ route to `correct_query` to retry with a reformulated search.
-   - If `POOR` and attempts are exhausted $\rightarrow$ route to `web_search` fallback via Tavily.
-5. **`correct_query`**: Analyzes the failed query and conversation context with `CORRECTIVE_PROMPT` to produce an expanded search query, then loops back to `hybrid_retrieve`.
-6. **`web_search`**: Queries Tavily Search API to gather supplementary information while preserving available video context.
-7. **`generate_answer`**: Synthesizes the final answer using `ANSWER_PROMPT`, formats timestamp citations, prunes conversation memory to `MEMORY_WINDOW` turns, updates the Upstash Redis Checkpointer, and streams tokens to the client.
+## Technology
 
----
+| Area | Implementation |
+|---|---|
+| Frontend | Streamlit |
+| API | FastAPI, Uvicorn, Server-Sent Events (SSE) |
+| RAG orchestration | LangGraph and LangChain |
+| Chat and summary models | Ollama-compatible API; defaults to `gemma4:31b-cloud` |
+| Embeddings | Google Gemini, `models/gemini-embedding-2` |
+| Retrieval | In-memory Chroma, BM25, reciprocal rank fusion (`k=60`) |
+| Transcript provider | Supadata |
+| Optional web search | Tavily |
+| Optional persistence | Upstash Redis REST and LangGraph Redis checkpointer |
+| Deployment | Docker; AWS ECR and CodeDeploy scripts/workflow are included |
 
-## Technology Stack
+## Repository Layout
 
-| Component | Technology | Role & Details |
-|---|---|---|
-| **Language Model** | `gemma4:31b-cloud` via Ollama | 128,000 token context window with automated 3-key failover |
-| **Orchestration** | LangGraph & LangChain | Stateful Corrective RAG (CRAG) graph with cyclic routing |
-| **Checkpointer & Memory** | `langgraph-checkpoint-upstash-redis` | Serverless Upstash Redis checkpointer + sliding memory window |
-| **Embeddings** | Google Gemini (`models/gemini-embedding-2`) | High-density semantic vector representations |
-| **Vector Indexing** | In-Memory ChromaDB | RAM-only ephemeral collections with LRU TTL garbage collection |
-| **Lexical Search** | `rank_bm25` | Sparse keyword retrieval scoring |
-| **Transcript Ingestion** | Supadata API | Multi-language transcript extraction with 4-key failover |
-| **Web Fallback** | Tavily Search API | External web search when video lacks required context |
-| **Backend API** | FastAPI & Uvicorn | Asynchronous REST and Server-Sent Events (SSE) streaming server |
-| **Frontend UI** | Streamlit | Responsive dark-mode interface with synchronized video player |
-| **Containerization** | Docker | Slim Python 3.12 non-root container deployment |
-| **Deployment & CI/CD** | AWS EC2, ECR & CodeDeploy | GitHub Actions automated linting, test runner, and deployment |
-
----
-
-## Project Structure
-
-```
-Youtube-RAG-Intelligence/
-├── requirements.txt              <- Pinned Python dependencies
-├── pyproject.toml                <- Project configuration and Ruff/Pytest settings
-├── Dockerfile                    <- Multi-stage slim container build specification
-├── appspec.yml                   <- AWS CodeDeploy lifecycle specification
-├── deploy/                       <- AWS deployment lifecycle automation scripts
-│   └── scripts/
-│       ├── install_dependencies.sh <- Prepares EC2 Docker host environment
-│       ├── start_docker.sh         <- Pulls container from ECR and launches
-│       └── stop_docker.sh          <- Stops running deployment containers
-├── tests/                        <- Automated unit test suite (7 test modules, 24 tests)
-│   ├── test_chunking.py          <- Text chunking & boundary tests
-│   ├── test_chat_release.py      <- Chat cache reference-release tests
-│   ├── test_redis_memory.py      <- Upstash Redis persistence & fallback tests
-│   ├── test_retrieval.py         <- Hybrid search & RRF fusion tests
-│   ├── test_supadata.py          <- Transcript key rotation & fallback tests
-│   ├── test_timestamp.py         <- Timestamp formatting and conversion tests
-│   └── test_youtube.py           <- YouTube URL, ID & schema validation tests
+```text
+.
 ├── backend/
-│   ├── main.py                   <- FastAPI application entrypoint & lifespan events
-│   ├── config.py                 <- Configuration loader, IPv4 preference & key pools
-│   ├── routes/                   <- Domain-driven modular route handlers
-│   │   ├── video/                <- Video ingestion & cache eviction (/init, /reset)
-│   │   ├── chat/                 <- LangGraph SSE streaming (/chat/stream)
-│   │   ├── summary/              <- Map-reduce summarization (/summary, /summary/stream)
-│   │   ├── redis/                <- Upstash Redis session memory & checkpointer APIs
-│   │   └── health/               <- Health checks & datewise log observability
-│   ├── core/
-│   │   ├── checkpointer.py       <- UpstashRedisSaver checkpointer factory
-│   │   ├── llm.py                <- Ollama model loader with 3-key failover
-│   │   ├── summary.py            <- Map-reduce multi-stage summarization engine
-│   │   ├── prompts/              <- System prompts (RAG, rewrite, grader, summary)
-│   │   │   ├── answer_prompts.py <- Answer generation with timestamp formatting
-│   │   │   ├── query_prompts.py  <- Pre-retrieval rewrite & corrective prompts
-│   │   │   ├── retrieval_prompts.py <- Document relevance grader prompt
-│   │   │   └── summary_prompts.py   <- Map-reduce chunk & final summary prompts
-│   │   ├── ingestion/            <- Ingestion & hybrid indexing pipeline
-│   │   │   ├── cache.py          <- Ephemeral LRU cache with idle TTL sweeper
-│   │   │   ├── chunking.py       <- Timestamp-preserving transcript chunker
-│   │   │   ├── embeddings.py     <- Gemini embeddings client
-│   │   │   ├── hybrid.py         <- Concurrent BM25 + dense search with RRF fusion
-│   │   │   └── vectorstore.py    <- In-memory ChromaDB collection manager
-│   │   └── workflow/             <- Modular LangGraph CRAG implementation
-│   │       ├── graph.py          <- StateGraph definition & conditional edges
-│   │       ├── state.py          <- RAGState TypedDict definition
-│   │       └── nodes/            <- Independent node handlers
-│   │           ├── rewrite_node.py    <- rewrite_query implementation
-│   │           ├── retrieval_node.py  <- hybrid_retrieve_node implementation
-│   │           ├── evaluate_node.py   <- evaluate_retrieval & route_after_evaluation
-│   │           ├── correct_node.py    <- correct_query implementation
-│   │           ├── web_search_node.py <- web_search fallback implementation
-│   │           ├── generate_node.py   <- generate_answer & memory persistence
-│   │           └── helpers.py         <- History formatters & rephrase helpers
-│   ├── services/
-│   │   ├── redis/                <- Upstash Redis session & conversation memory
-│   │   │   ├── service.py        <- Session CRUD & message turn manager
-│   │   │   └── utils.py          <- User sanitization and key namespaces
-│   │   ├── transcript/           <- Subtitle extraction services
-│   │   │   └── supadata.py       <- Supadata 4-key rotation & failover client
-│   │   ├── search/               <- External search fallback
-│   │   │   └── tavily.py         <- Tavily search client
-│   │   └── youtube/              <- YouTube utilities
-│   │       ├── metadata.py       <- Video oEmbed metadata extractor
-│   │       └── parser.py         <- Re-exports the shared URL/ID parser
-│   └── utils/
-│       ├── constants.py          <- Memory windows and default parameters
-│       ├── logger.py             <- Datewise Markdown logging utility
-│       ├── timestamp.py          <- Timestamp conversion helpers
-│       └── youtube.py            <- Shared video ID regex & URL parser
-└── frontend/
-    ├── app.py                    <- Streamlit UI entrypoint
-    ├── assets/
-    │   └── styles.css            <- Modern CSS styles and theme overrides
-    ├── components/
-    │   ├── chat.py               <- Streaming conversation interface & citations
-    │   ├── landing.py            <- URL input and onboarding view
-    │   ├── sidebar.py            <- Profile manager, history & controls
-    │   ├── summary.py            <- Summary viewer and export buttons
-    │   └── transcript.py         <- Searchable transcript view with timestamps
-    ├── services/
-    │   ├── api/                  <- Modular backend API client handlers
-    │   │   ├── video.py          <- Ingestion & reset requests
-    │   │   ├── chat.py           <- Server-Sent Events chat streaming
-    │   │   ├── summary.py        <- Summary streaming & sync client
-    │   │   ├── memory.py         <- Remote Redis session & history sync
-    │   │   └── health.py         <- Service ping & health checks
-    │   └── chat_storage.py       <- Local session history helpers
-    └── utils/
-        ├── constants.py          <- UI configuration and limits
-        ├── session.py            <- Streamlit session state management
-        ├── timestamp.py          <- Timestamp display utilities
-        └── youtube.py            <- Re-exports the shared URL/ID parser
+│   ├── core/                 # RAG workflow, prompts, ingestion, LLM, summaries
+│   ├── routes/               # FastAPI route groups and request schemas
+│   ├── services/             # Redis, transcript, search, and YouTube integrations
+│   └── utils/                # Shared constants, logging, timestamp, URL helpers
+├── frontend/
+│   ├── app.py                # Streamlit entry point
+│   ├── components/           # Landing, chat, summary, sidebar, transcript UI
+│   ├── services/api/         # Backend HTTP and SSE clients
+│   └── assets/               # UI styles
+├── tests/                    # unittest-compatible tests
+├── deploy/scripts/           # EC2 install, start, and stop scripts
+├── .github/workflows/        # CI and optional AWS deployment workflow
+├── Dockerfile
+├── appspec.yml
+├── pyproject.toml
+├── requirements.txt
+└── uv.lock
 ```
 
----
+## Requirements
 
-## FastAPI Backend Endpoints
+- Python 3.12 or newer.
+- API credentials for Ollama and Google Gemini.
+- A Supadata API key to fetch transcripts.
+- Optional: Upstash Redis credentials for persistent sessions and graph checkpoints.
+- Optional: a Tavily API key for web search fallback.
+- Docker for container deployment.
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/` | Root API health status and service metadata |
-| `GET` | `/docs` | Interactive Swagger UI API documentation (`/youtube-rag-backend/docs` in production) |
-| `GET` | `/redoc` | Interactive ReDoc API documentation (`/youtube-rag-backend/redoc` in production) |
-| `GET` | `/health`, `/api/health` | Health check for Docker, load balancers, and monitoring |
-| `POST` | `/init` | Ingest video, fetch transcript & metadata, build in-memory vector stores |
-| `POST` | `/chat/stream` | Stream reasoning states, answer tokens, and citations via SSE |
-| `POST` | `/summary/stream` | Stream map-reduce progress events and final summary tokens via SSE |
-| `POST` | `/summary` | Non-streaming map-reduce summary generation |
-| `GET` | `/api/chats` | List all conversation sessions for a user or video |
-| `POST` | `/api/chats` | Create or register a new chat session in Redis |
-| `GET` | `/api/chats/{chat_id}` | Retrieve chat history and message turns for a session |
-| `POST` | `/api/chats/{chat_id}/messages` | Save a message turn to Redis |
-| `DELETE` | `/api/chats/{chat_id}` | Delete a chat session and its LangGraph checkpointer state |
-| `DELETE` | `/api/chats` | Clear all chat sessions for a video |
-| `GET` | `/api/memory/health` | Upstash Redis connection status check |
-| `POST` | `/reset` | Evict a specific video vector store from memory cache |
-| `GET` | `/api/logs/dates` | List available datewise log files |
-| `GET` | `/api/logs` | Fetch datewise Markdown logs |
+## Local Setup
 
----
-
-## Local Development Setup
-
-### 1. Clone the Repository
+### 1. Clone and create a virtual environment
 
 ```bash
 git clone https://github.com/Aryanupadhyay23/Youtube-RAG-Intelligence.git
 cd Youtube-RAG-Intelligence
+python -m venv .venv
 ```
 
-### 2. Create and Activate Virtual Environment
+Activate the environment:
 
 ```bash
-python -m venv .venv
-
-# Linux / macOS:
+# Linux / macOS
 source .venv/bin/activate
 
-# Windows (PowerShell):
+# Windows PowerShell
 .venv\Scripts\Activate.ps1
 ```
 
-### 3. Install Dependencies
+### 2. Install dependencies
 
 ```bash
+python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-### 4. Configure Environment Variables
+For linting and pytest support, install the development tools:
 
-Create a `.env` file in the root directory:
+```bash
+pip install ruff pytest
+```
+
+### 3. Configure environment
+
+Create a `.env` file in the repository root. Set the primary credentials at minimum:
 
 ```env
-# --- Ollama Cloud Inference (Gemma 4 with 3-Key Failover) ---
-OLLAMA_API_KEY_ONE="your_primary_ollama_key"
-OLLAMA_API_KEY_SECOND="your_second_ollama_key"
-OLLAMA_API_KEY_THIRD="your_third_ollama_key"
-OLLAMA_HOST="https://ollama.com"
-OLLAMA_MODEL="gemma4:31b-cloud"
-OLLAMA_SUMMARY_MODEL="gemma4:31b-cloud"
+# Required for chat and summaries (one or more Ollama keys)
+OLLAMA_API_KEY_ONE=your_ollama_key
+OLLAMA_HOST=https://ollama.com
+OLLAMA_MODEL=gemma4:31b-cloud
+OLLAMA_SUMMARY_MODEL=gemma4:31b-cloud
 OLLAMA_NUM_CTX=131072
 
-# --- Google Gemini Embeddings ---
-GOOGLE_API_KEY="your_google_gemini_api_key"
+# Required for transcript embeddings and transcript extraction
+GOOGLE_API_KEY=your_google_api_key
+SUPADATA_KEY_ONE=your_supadata_key
 
-# --- Supadata Transcript Extraction (4-Key Failover) ---
-SUPADATA_KEY_ONE="your_supadata_key_1"
-SUPADATA_KEY_TWO="your_supadata_key_2"
-SUPADATA_KEY_THREE="your_supadata_key_3"
-SUPADATA_KEY_FOUR="your_supadata_key_4"
+# Optional additional Supadata keys. Keys are tried in listed order.
+SUPADATA_KEY_TWO=your_second_supadata_key
+SUPADATA_KEY_THREE=your_third_supadata_key
+SUPADATA_KEY_FOUR=your_fourth_supadata_key
 
-# --- Tavily Web Search (Optional Fallback) ---
-TAVILY_API_KEY="your_tavily_api_key"
+# Optional additional Ollama keys. Keys are tried in listed order.
+OLLAMA_API_KEY_SECOND=your_second_ollama_key
+OLLAMA_API_KEY_THIRD=your_third_ollama_key
 
-# --- Upstash Redis Checkpointer & Memory ---
-UPSTASH_REDIS_REST_URL="https://your-database.upstash.io"
-UPSTASH_REDIS_REST_TOKEN="your_upstash_rest_token"
+# Optional web search fallback
+TAVILY_API_KEY=your_tavily_key
 
-# --- Ephemeral Memory Cache Settings ---
+# Optional Upstash Redis persistence
+UPSTASH_REDIS_REST_URL=https://your-database.upstash.io
+UPSTASH_REDIS_REST_TOKEN=your_upstash_rest_token
+
+# Optional video index cache settings
 MAX_ACTIVE_VIDEOS=10
 VIDEO_INACTIVITY_TTL_MINUTES=45
 
-# --- Observability (Optional) ---
-LANGSMITH_TRACING=false
+# Optional: frontend backend URL (defaults to http://127.0.0.1:8000)
+BACKEND_API_URL=http://127.0.0.1:8000
 ```
 
-### 5. Run the Application
+The application also accepts `GEMINI_API_KEY` as an alias for `GOOGLE_API_KEY`. Supadata keys can use numbered names (`SUPADATA_KEY_1` through `_4`) or word names as shown above. Ollama keys support `OLLAMA_API_KEY_ONE`, `OLLAMA_API_KEY_SECOND`, `OLLAMA_API_KEY_THIRD` and numeric aliases; `OLLAMA_API_KEY` is also accepted. If Redis is not configured or cannot be initialized, the graph checkpointer falls back to in-memory storage. Chat session persistence also requires Redis to be configured.
 
-Start both the backend server and frontend interface:
+Keep `.env` and real credentials private; never commit them to source control.
 
-**Terminal 1 — FastAPI Backend (Port 8000):**
+### 4. Start the application
+
+Run the backend and frontend in separate terminals from the repository root:
+
 ```bash
+# Terminal 1: FastAPI backend
 uvicorn backend.main:app --reload --port 8000
 ```
-Interactive Swagger UI documentation is available at `http://localhost:8000/docs`.
 
-**Terminal 2 — Streamlit Frontend (Port 8501):**
 ```bash
+# Terminal 2: Streamlit frontend
 streamlit run frontend/app.py --server.port 8501
 ```
 
-Access the Streamlit application in your browser at `http://localhost:8501`.
+Open <http://localhost:8501>. The API and Swagger docs are available at <http://localhost:8000> and <http://localhost:8000/docs>.
 
-### 6. Run Automated Tests
+## Tests and Linting
 
-Execute the automated test suite locally:
+The tests use Python's `unittest` and can also be run with pytest:
 
 ```bash
-# Run unit tests
 python -m unittest discover tests
-
-# Or with pytest (if installed in dev)
+# or
 pytest
 ```
 
----
-
-## Docker & AWS EC2 Deployment
-
-The application features a **multi-stage, ultra-slim Docker build** (`builder` -> `runner`) optimized for low image footprint, minimal build times, and high security:
-
-### Key Container Optimizations
-- **Multi-Stage Separation**: Build dependencies (`build-essential` and gcc compilers for `chroma-hnswlib`) are isolated in the `builder` stage and omitted entirely from the final `runner` image.
-- **Virtualenv Artifact Stripping**: Prunes development tests, `__pycache__`, and `*.pyc`/`*.pyo` files from `/opt/venv` prior to copying.
-- **Selective Layer Copying**: Copies only necessary source folders (`backend/`, `frontend/`) to prevent leaking development files, tests, or credentials.
-- **Non-Root Execution**: Runs under an unprivileged `appuser` (UID 1000) with write permissions restricted to `/app/logs`.
-
-### 1. Build and Run Container Locally
+Run Ruff if installed:
 
 ```bash
-# Build the multi-stage Docker image
-docker build -t youtube-rag-intelligence .
+ruff check .
+```
 
-# Run container mapping host port 80 to Streamlit (7860) and 8000 to FastAPI
-docker run -d \
-  --name youtube-rag \
-  -p 80:7860 \
+## Docker
+
+The Docker image uses Python 3.12, installs dependencies in a builder stage, and runs the API and Streamlit processes as a non-root user. The container serves the API on port `8000` and Streamlit on port `7860`.
+
+```bash
+docker build -t youtube-rag-intelligence .
+docker run --rm --name youtube-rag \
   -p 8000:8000 \
+  -p 7860:7860 \
   --env-file .env \
   youtube-rag-intelligence
 ```
 
-### 2. CI/CD Pipeline (GitHub Actions & AWS CodeDeploy)
+Open the UI at <http://localhost:7860> and the API docs at <http://localhost:8000/docs>. The image health check targets `http://127.0.0.1:8000/health`.
 
-The automated deployment pipeline in `.github/workflows/deploy.yml`:
-1. **Lints & Validates**: Runs Ruff, Python syntax validation, and automated unit test suite.
-2. **Builds & Pushes**: Builds the multi-stage Docker image using Buildx and pushes to Amazon ECR.
-3. **Deploys via CodeDeploy**: Packages deployment bundle, uploads to Amazon S3, and triggers an in-place deployment to the AWS EC2 instance.
-4. **Starts Container**: `deploy/scripts/start_docker.sh` executes on the EC2 host, launching FastAPI (with `--root-path /youtube-rag-backend`) and Streamlit (with `--server.baseUrlPath=youtube-rag`) mapped to ports 8000 and 7860, exposed at `https://aryan-projects.duckdns.org/youtube-rag` and `https://aryan-projects.duckdns.org/youtube-rag-backend/docs` with an automatic restart policy (`--restart unless-stopped`).
+## AWS Deployment
 
----
+The repository includes an AWS CodeDeploy AppSpec and EC2 lifecycle scripts. `deploy/scripts/install_dependencies.sh` prepares Docker and AWS CLI on the instance; `start_docker.sh` pulls the `latest` image from ECR and starts the container, optionally loading `/home/ubuntu/.env` or `/home/ubuntu/app/.env`; `stop_docker.sh` removes the prior container.
 
-## Environment Variables Reference
+The GitHub Actions workflow at `.github/workflows/deploy.yml` defines Ruff, unit-test, Python compilation, and smoke-test CI plus an optional ECR/S3/CodeDeploy deployment. **The checked-in workflow is gated off by default** (`EXECUTE_PIPELINE: "false"` and `ENABLE_AWS: "false"`), so a push does not currently run CI or deploy. Enable the workflow gates and configure the required AWS credentials/secrets and infrastructure before using it. The deployment script configures Streamlit at `/youtube-rag` and FastAPI's root path at `/youtube-rag-backend` behind the expected reverse proxy.
+
+## Configuration Reference
 
 | Variable | Required | Default | Purpose |
 |---|---|---|---|
-| `OLLAMA_API_KEY_ONE` | **Yes** | — | Primary Ollama cloud key for `gemma4:31b-cloud` |
-| `OLLAMA_API_KEY_SECOND` | No | — | Second Ollama failover key |
-| `OLLAMA_API_KEY_THIRD` | No | — | Third Ollama failover key |
-| `OLLAMA_MODEL` | No | `gemma4:31b-cloud` | Chat generation model |
-| `OLLAMA_SUMMARY_MODEL` | No | `gemma4:31b-cloud` | Video summarization model |
-| `OLLAMA_NUM_CTX` | No | `131072` | Context window size (tokens) |
-| `GOOGLE_API_KEY` | **Yes** | — | Gemini embeddings API key |
-| `SUPADATA_KEY_ONE` | **Yes** | — | Primary transcript extraction key |
-| `SUPADATA_KEY_TWO..FOUR` | No | — | Backup transcript extraction keys |
-| `UPSTASH_REDIS_REST_URL` | No | — | Upstash Redis REST endpoint for memory |
-| `UPSTASH_REDIS_REST_TOKEN`| No | — | Upstash Redis REST authentication token |
-| `TAVILY_API_KEY` | No | — | External web search fallback key |
-| `MAX_ACTIVE_VIDEOS` | No | `10` | Maximum video vector stores retained in RAM |
-| `VIDEO_INACTIVITY_TTL_MINUTES` | No | `45` | Cache eviction timeout for idle sessions |
-
----
+| `OLLAMA_API_KEY_ONE` or another supported Ollama key | Yes for model calls | — | Ollama API authentication; configured keys form the model fallback chain |
+| `OLLAMA_HOST` | No | `https://ollama.com` | Ollama-compatible API host |
+| `OLLAMA_MODEL` | No | Value of `OLLAMA_SUMMARY_MODEL` | Chat and RAG model |
+| `OLLAMA_SUMMARY_MODEL` | No | `gemma4:31b-cloud` | Summary model |
+| `OLLAMA_NUM_CTX` | No | `131072` | Model context window passed to Ollama |
+| `GOOGLE_API_KEY` / `GEMINI_API_KEY` | Yes for indexing | — | Gemini embeddings authentication |
+| `SUPADATA_KEY_ONE` or `SUPADATA_KEY_1` | Yes for transcript ingestion | — | Primary Supadata key; up to four keys are supported |
+| `TAVILY_API_KEY` | No | — | Web search fallback key |
+| `UPSTASH_REDIS_REST_URL` | No | — | Upstash REST endpoint |
+| `UPSTASH_REDIS_REST_TOKEN` | No | — | Upstash REST authentication token |
+| `REDIS_URL` | No | — | Optional Redis connection URL used by Redis services |
+| `MAX_ACTIVE_VIDEOS` | No | `10` | Maximum active video indexes in process memory |
+| `VIDEO_INACTIVITY_TTL_MINUTES` | No | `45` | Idle cache expiration in minutes |
+| `BACKEND_API_URL` | No | `http://127.0.0.1:8000` | Backend URL used by the Streamlit API client |
 
 ## Troubleshooting
 
-| Symptom | Cause | Solution |
+| Symptom | Likely cause | What to check |
 |---|---|---|
-| `No transcript available` | Closed captions or subtitles are disabled on YouTube | Try a video with subtitles or auto-generated captions |
-| `Invalid YouTube URL` | URL format is not recognized | Provide a standard link such as `https://www.youtube.com/watch?v=...` or `https://youtu.be/...` |
-| `Redis offline / fallback` | Upstash Redis credentials not set in `.env` | Configure `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` (system automatically falls back to in-memory checkpointer) |
-| `Ollama Rate Limit (429)` | Primary API key quota reached | Add backup keys (`OLLAMA_API_KEY_SECOND`, `THIRD`) for automatic failover |
-
----
+| Transcript unavailable | Video is private, blocked, or has no accessible captions | Try a public video with captions and verify the Supadata key |
+| Video initialization fails | Missing/invalid transcript or Gemini credentials, or provider/network issue | Check backend logs and `GOOGLE_API_KEY` / `SUPADATA_KEY_ONE` |
+| Chat or summary model errors | Missing Ollama credentials, quota, or unreachable model host | Check `OLLAMA_HOST`, model names, and configured Ollama keys |
+| Chat history is not persistent | Redis is not configured or reachable | Set both Upstash REST variables and check `/api/memory/health`; graph checkpoints otherwise use memory |
+| UI shows backend offline | Backend is not running or frontend points to a wrong URL | Check the backend `/health` route and `BACKEND_API_URL` |
 
 ## License
 
-This is a personal/learning project. No license file is currently included; add one (for example, MIT) if you plan to distribute the code.
+No license file is currently included. Add a license before redistributing the project under specific terms.

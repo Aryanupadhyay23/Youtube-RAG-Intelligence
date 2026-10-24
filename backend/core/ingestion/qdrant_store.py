@@ -112,6 +112,8 @@ class QdrantVideoCache:
         """Return a persisted video manifest and chunk documents, or ``None`` on a cache miss."""
         client = self._get_client()
         try:
+            if not client.collection_exists(self.collection_name):
+                return None
             manifest_points, _ = client.scroll(
                 collection_name=self.collection_name,
                 scroll_filter=_filter_for(video_id, "manifest"),

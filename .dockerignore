@@ -1,7 +1,8 @@
 # Git & GitHub
-.git
+.git/
 .gitignore
-.github
+.gitattributes
+.github/
 
 # Docker & CI/CD deployment files
 .dockerignore
@@ -9,6 +10,7 @@ Dockerfile
 deploy/
 appspec.yml
 pyproject.toml
+uv.lock
 
 # Environment variables & secrets
 .env
@@ -16,6 +18,7 @@ pyproject.toml
 .streamlit/secrets.toml
 *.pem
 *.key
+*.cert
 *.p12
 *.pfx
 
@@ -45,31 +48,35 @@ tests/
 coverage.xml
 htmlcov/
 
-# IDEs & OS files
+# IDEs & OS metadata
 .vscode/
 .idea/
 .DS_Store
 Thumbs.db
+desktop.ini
 
-# Temporary / backup files
+# Temporary & backup files
 *.tmp
 *.bak
 *.orig
+scratch/
+interview.txt
 
-# Logs, Databases & Data directories
+# Logs, Databases & Local storage
 logs/
 *.log
 data/
 .cache/
-scratch/
-instructions.txt
 *.sqlite
 *.sqlite3
 *.sqlite-shm
 *.sqlite-wal
 *.db
-chroma_db/
-faiss_index/
+.qdrant/
+qdrant_storage/
 
-# Documentation
+# Archives & documentation
+*.zip
+*.tar.gz
+deployment.zip
 README.md

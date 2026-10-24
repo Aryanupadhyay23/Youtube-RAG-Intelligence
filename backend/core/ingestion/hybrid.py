@@ -16,15 +16,12 @@ async def hybrid_retrieve(
     rrf_k: int = RRF_K,
 ) -> List[Document]:
     """
-    Performs hybrid retrieval asynchronously using concurrent BM25 and semantic vector search
-    fused with Reciprocal Rank Fusion (RRF). Pure async, zero legacy bloat, 20x faster import.
+    Run keyword and semantic retrieval concurrently, then merge both ranked
+    lists with Reciprocal Rank Fusion (RRF) and return the top matches.
     """
     semantic_retriever = vector_store.as_retriever(search_kwargs={"k": semantic_k})
 
-    if bm25_retriever is None:
-        return (await semantic_retriever.ainvoke(query))[:final_k]
-
-    # Execute BM25 and Chroma semantic search in parallel without mutating shared state
+    # Execute keyword and semantic search in parallel without mutating shared state
     bm25_raw, semantic_docs = await asyncio.gather(
         bm25_retriever.ainvoke(query),
         semantic_retriever.ainvoke(query),

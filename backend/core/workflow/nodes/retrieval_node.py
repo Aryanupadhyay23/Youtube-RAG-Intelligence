@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 
 async def hybrid_retrieve_node(state: RAGState, config: RunnableConfig) -> dict:
-    """Execute hybrid dense + sparse retrieval (ChromaDB + BM25 with RRF)."""
+    """Execute hybrid dense + sparse retrieval (Qdrant + BM25 with RRF)."""
     query = state.get("rewritten_query", state["query"])
     vector_store = config["configurable"]["vector_store"]
     bm25 = config["configurable"]["bm25_retriever"]

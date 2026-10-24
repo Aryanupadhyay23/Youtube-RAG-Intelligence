@@ -82,14 +82,19 @@ def _int_env(name: str, default: str) -> int:
 OLLAMA_NUM_CTX = _int_env("OLLAMA_NUM_CTX", "131072")
 
 
-# --- Ephemeral Vector Store Cache Configuration ---
+# --- Active video cache in process memory ---
 MAX_ACTIVE_VIDEOS = _int_env("MAX_ACTIVE_VIDEOS", "10")
 VIDEO_INACTIVITY_TTL_MINUTES = _int_env("VIDEO_INACTIVITY_TTL_MINUTES", "45")
+
+# --- Qdrant Cloud video embedding cache ---
+# QDRANT_CLUSTER_ENDPOINT is the Cloud URL shown in the Qdrant dashboard.
+QDRANT_API_KEY = _clean_env(os.environ.get("QDRANT_API_KEY"))
+QDRANT_CLUSTER_ENDPOINT = _clean_env(
+    os.environ.get("QDRANT_CLUSTER_ENDPOINT") or os.environ.get("QDRANT_URL")
+)
+QDRANT_COLLECTION = _clean_env(os.environ.get("QDRANT_COLLECTION", "youtube_video_embeddings"))
+QDRANT_KEEPALIVE_REQUESTS = max(10, _int_env("QDRANT_KEEPALIVE_REQUESTS", "10"))
 
 # --- Upstash Redis Conversation Memory Configuration ---
 UPSTASH_REDIS_REST_URL = _clean_env(os.environ.get("UPSTASH_REDIS_REST_URL"))
 UPSTASH_REDIS_REST_TOKEN = _clean_env(os.environ.get("UPSTASH_REDIS_REST_TOKEN"))
-REDIS_URL = _clean_env(os.environ.get("REDIS_URL"))
-if not REDIS_URL and UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN:
-    host = UPSTASH_REDIS_REST_URL.replace("https://", "").replace("http://", "").rstrip("/")
-    REDIS_URL = f"rediss://default:{UPSTASH_REDIS_REST_TOKEN}@{host}:6379"

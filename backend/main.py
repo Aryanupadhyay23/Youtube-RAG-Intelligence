@@ -7,7 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.core.workflow import build_langgraph
 from backend.core.checkpointer import get_redis_checkpointer
-from backend.core.ingestion import EphemeralVideoStoreCache
+from backend.config import QDRANT_KEEPALIVE_REQUESTS
+from backend.core.ingestion import EphemeralVideoStoreCache, QdrantVideoCache
 from backend.utils.logger import setup_logging
 
 # Import modular route handlers from subfolders
@@ -30,6 +31,8 @@ async def lifespan(app: FastAPI):
 
     # In-Memory Ephemeral Cache with capacity + inactivity TTL eviction
     app.state.video_stores = EphemeralVideoStoreCache()
+    # Construction is local only; the first Cloud operation handles unavailable Qdrant gracefully.
+    app.state.qdrant_video_cache = QdrantVideoCache()
 
     # Periodic background task to sweep inactive videos from RAM
     stop_event = asyncio.Event()
@@ -51,13 +54,42 @@ async def lifespan(app: FastAPI):
                 logger.warning(f"Error during periodic memory cleanup: {e}")
 
     cleanup_task = asyncio.create_task(periodic_cleanup())
+
+    async def periodic_qdrant_keepalive():
+        """Keep a free-tier Qdrant Cloud cluster active without affecting request handling."""
+        while not stop_event.is_set():
+            try:
+                await asyncio.wait_for(stop_event.wait(), timeout=3600)
+                break
+            except asyncio.TimeoutError:
+                pass
+            except asyncio.CancelledError:
+                break
+
+            qdrant_cache = app.state.qdrant_video_cache
+            if not qdrant_cache.enabled:
+                continue
+            successes = 0
+            for _ in range(QDRANT_KEEPALIVE_REQUESTS):
+                if stop_event.is_set():
+                    break
+                if await asyncio.to_thread(qdrant_cache.ping):
+                    successes += 1
+            logger.info(
+                "Qdrant keepalive finished: %s/%s requests succeeded.",
+                successes,
+                QDRANT_KEEPALIVE_REQUESTS,
+            )
+
+    qdrant_keepalive_task = asyncio.create_task(periodic_qdrant_keepalive())
     try:
         yield
     finally:
         stop_event.set()
         cleanup_task.cancel()
+        qdrant_keepalive_task.cancel()
         try:
-            await asyncio.gather(cleanup_task, return_exceptions=True)
+            await asyncio.gather(cleanup_task, qdrant_keepalive_task, return_exceptions=True)
         except Exception:
             pass
         app.state.video_stores.clear()

@@ -73,5 +73,24 @@ docker run -d \
     '
 
 echo "YouTube RAG container started."
+
+# Wait for the backend before reporting success so CodeDeploy does not mark a
+# broken container as healthy.
+HEALTHY=0
+for _ in {1..60}; do
+    if curl -fsS http://127.0.0.1:8000/health >/dev/null 2>&1; then
+        HEALTHY=1
+        break
+    fi
+    sleep 2
+done
+
+if [ "${HEALTHY}" != "1" ]; then
+    echo "Container did not become healthy. Recent logs:"
+    docker logs --tail 100 "${CONTAINER_NAME}" 2>/dev/null || true
+    exit 1
+fi
+
+echo "Backend health check passed."
 echo "Frontend: http://aryan-projects.duckdns.org/youtube-rag/"
 echo "Backend docs: http://aryan-projects.duckdns.org/youtube-rag-backend/docs"

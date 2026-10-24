@@ -1,5 +1,5 @@
 # ==========================================
-# Stage 1: Builder (Compiles C/C++ extensions)
+# Stage 1: Builder (installs dependencies)
 # ==========================================
 FROM python:3.12-slim AS builder
 
@@ -7,11 +7,6 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
 WORKDIR /build
-
-# Install compiler tools required for building native wheels (e.g. chroma-hnswlib)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
 
 # Create isolated virtual environment
 RUN python -m venv /opt/venv
@@ -62,7 +57,7 @@ USER appuser
 EXPOSE 7860
 
 # Container health: backend /health endpoint is env-independent
-HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=120s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4)" || exit 1
 
 # Run both servers under a single supervisor shell: if either process dies the

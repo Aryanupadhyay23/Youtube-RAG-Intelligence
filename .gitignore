@@ -3,8 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.pyd
+*.pyo
 
-# Environments and Virtualenv
+# Virtual Environments
 .venv/
 venv/
 ENV/
@@ -19,12 +20,14 @@ venv.bak/
 .streamlit/secrets.toml
 *.pem
 *.key
+*.cert
 *.p12
 *.pfx
 
-# Distribution / packaging
+# Packaging & Distribution
 build/
 dist/
+eggs/
 *.egg-info/
 *.egg
 
@@ -38,37 +41,48 @@ dist/
 coverage.xml
 htmlcov/
 
-# IDEs and Editors
+# IDEs & Code Editors
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
+*.sublime-project
+*.sublime-workspace
 
 # Operating System Files
 .DS_Store
-Thumbs.db
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
 ehthumbs.db
+Thumbs.db
+desktop.ini
 
-# Temporary / backup files
+# Temporary & Scratch Files
 *.tmp
 *.bak
 *.orig
+scratch/
+interview.txt
 
-# Databases & Local Vector Stores
+# Databases & Vector Storage
 *.sqlite
 *.sqlite3
 *.sqlite-shm
 *.sqlite-wal
 *.db
-chroma_db/
-faiss_index/
+.qdrant/
+qdrant_storage/
 
-# Data, Logs & Caches
+# Logs & App Data
 logs/
 *.log
 data/
 .cache/
-scratch/
-instructions.txt
-interview.txt
+
+# Deployment & Archives
+*.zip
+*.tar.gz
+deployment.zip

@@ -6,7 +6,6 @@ from collections import OrderedDict
 import asyncio
 
 from backend.config import MAX_ACTIVE_VIDEOS, VIDEO_INACTIVITY_TTL_MINUTES
-from backend.core.ingestion.vectorstore import delete_video_collection
 
 logger = logging.getLogger(__name__)
 
@@ -102,14 +101,6 @@ class EphemeralVideoStoreCache:
                 f"Video '{video_id}' stored in ephemeral RAM. (Active count: {len(self._stores)}/{self.max_videos})"
             )
 
-    def acquire(self, video_id: str):
-        """Increment in-flight reference count to shield video from eviction during streaming."""
-        with self._lock:
-            if video_id not in self._stores:
-                return
-            self._ref_counts[video_id] = self._ref_counts.get(video_id, 0) + 1
-            self._last_accessed[video_id] = time.time()
-
     def release(self, video_id: str):
         """Decrement reference count after stream finishes.
 
@@ -136,10 +127,6 @@ class EphemeralVideoStoreCache:
         self._stores.pop(video_id, None)
         self._last_accessed.pop(video_id, None)
         self._ref_counts.pop(video_id, None)
-        try:
-            delete_video_collection(video_id)
-        except Exception as e:
-            logger.warning(f"Error freeing Chroma collection for '{video_id}': {e}")
         logger.info(f"Evicted video '{video_id}' from ephemeral RAM.")
         return True
 

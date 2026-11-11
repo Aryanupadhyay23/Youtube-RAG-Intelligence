@@ -1,12 +1,11 @@
 import logging
 from functools import lru_cache
-from langchain_ollama import ChatOllama
+from langchain_google_genai import ChatGoogleGenerativeAI
 from backend.config import (
-    OLLAMA_HOST,
-    OLLAMA_API_KEYS,
-    OLLAMA_SUMMARY_MODEL,
-    OLLAMA_MODEL,
-    OLLAMA_NUM_CTX,
+    GOOGLE_API_KEYS,
+    GOOGLE_MODEL,
+    GOOGLE_SUMMARY_MODEL,
+    GOOGLE_MAX_RETRIES,
 )
 from backend.utils.constants import LLM_TEMPERATURE
 
@@ -17,20 +16,22 @@ def _mask_api_key(key: str) -> str:
     """Mask key for secure logging."""
     if not key:
         return "None"
-    if len(key) <= 6:
+    if len(key) <= 8:
         return "***"
-    return f"{key[:4]}***"
+    return f"{key[:6]}...{key[-4:]}"
 
 
-def _create_ollama_client(model_name: str, api_key: str, key_index: int, total_keys: int):
-    """Instantiate a ChatOllama instance with Authorization header, context window limit, and failure logging."""
-    client_kwargs = {"headers": {"Authorization": f"Bearer {api_key}"}} if api_key else {}
-    model = ChatOllama(
+def _create_genai_client(model_name: str, api_key: str, key_index: int, total_keys: int):
+    """Instantiate a ChatGoogleGenerativeAI instance with retry support and failure logging."""
+    kwargs = {}
+    if "flash-lite" not in model_name.lower():
+        kwargs["temperature"] = LLM_TEMPERATURE
+
+    model = ChatGoogleGenerativeAI(
         model=model_name,
-        base_url=OLLAMA_HOST,
-        temperature=LLM_TEMPERATURE,
-        num_ctx=OLLAMA_NUM_CTX,
-        client_kwargs=client_kwargs,
+        google_api_key=api_key,
+        max_retries=GOOGLE_MAX_RETRIES,
+        **kwargs,
     )
 
     def on_error(run):
@@ -43,12 +44,12 @@ def _create_ollama_client(model_name: str, api_key: str, key_index: int, total_k
         masked_key = _mask_api_key(api_key)
         if key_index < total_keys:
             logger.warning(
-                f"Ollama request failed on API key #{key_index} ({masked_key}): {err_line}. "
+                f"Google GenAI request failed on API key #{key_index} ({masked_key}): {err_line}. "
                 f"Falling back to API key #{key_index + 1}..."
             )
         else:
             logger.error(
-                f"Ollama request failed on final API key #{key_index} ({masked_key}): {err_line}. "
+                f"Google GenAI request failed on final API key #{key_index} ({masked_key}): {err_line}. "
                 "No more fallback keys available."
             )
 
@@ -56,12 +57,12 @@ def _create_ollama_client(model_name: str, api_key: str, key_index: int, total_k
 
 
 def _build_model_with_fallbacks(model_name: str):
-    """Build primary ChatOllama runnable chained with fallback models across all configured keys."""
-    keys = OLLAMA_API_KEYS or [""]
+    """Build primary ChatGoogleGenerativeAI runnable chained with fallback models across all configured keys."""
+    keys = GOOGLE_API_KEYS or [""]
     total_keys = len(keys)
-    logger.info(f"Initialized Ollama model '{model_name}' with {total_keys} API key(s) for fallback support.")
+    logger.info(f"Initialized Google GenAI model '{model_name}' with {total_keys} API key(s) for fallback support.")
 
-    models = [_create_ollama_client(model_name, key, idx + 1, total_keys) for idx, key in enumerate(keys)]
+    models = [_create_genai_client(model_name, key, idx + 1, total_keys) for idx, key in enumerate(keys)]
 
     if len(models) == 1:
         return models[0]
@@ -71,11 +72,11 @@ def _build_model_with_fallbacks(model_name: str):
 
 @lru_cache(maxsize=1)
 def load_llm():
-    """Load ChatOllama for chatting and RAG with multi-key fallback."""
-    return _build_model_with_fallbacks(OLLAMA_MODEL)
+    """Load ChatGoogleGenerativeAI for chatting and RAG with multi-key fallback."""
+    return _build_model_with_fallbacks(GOOGLE_MODEL)
 
 
 @lru_cache(maxsize=1)
 def load_summary_llm():
-    """Load ChatOllama for video summaries with multi-key fallback."""
-    return _build_model_with_fallbacks(OLLAMA_SUMMARY_MODEL)
+    """Load ChatGoogleGenerativeAI for video summaries with multi-key fallback."""
+    return _build_model_with_fallbacks(GOOGLE_SUMMARY_MODEL)

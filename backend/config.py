@@ -33,7 +33,55 @@ def _clean_env(val: str | None) -> str:
     return val
 
 
-GOOGLE_API_KEY = _clean_env(os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY"))
+def _int_env(name: str, default: str) -> int:
+    """Parse an integer env var at import time without crashing on malformed values."""
+    try:
+        return int(_clean_env(os.environ.get(name, default)) or default)
+    except (TypeError, ValueError):
+        return int(default)
+
+
+# --- Google GenAI Configuration (For Video Summaries & Chat with 3 Fallback Keys) ---
+_three_keys = [
+    cleaned
+    for key in [
+        os.environ.get("GOOGLE_API_KEY_ONE") or os.environ.get("GOOGLE_API_KEY_1"),
+        os.environ.get("GOOGLE_API_KEY_TWO") or os.environ.get("GOOGLE_API_KEY_2"),
+        os.environ.get("GOOGLE_API_KEY_THREE") or os.environ.get("GOOGLE_API_KEY_3"),
+    ]
+    if (cleaned := _clean_env(key))
+]
+if _three_keys:
+    GOOGLE_API_KEYS = list(dict.fromkeys(_three_keys))
+else:
+    GOOGLE_API_KEYS = [
+        cleaned
+        for key in [
+            os.environ.get("GOOGLE_API_KEY"),
+            os.environ.get("GEMINI_API_KEY"),
+        ]
+        if (cleaned := _clean_env(key))
+    ]
+    GOOGLE_API_KEYS = list(dict.fromkeys(GOOGLE_API_KEYS))
+
+# Fallback for single GOOGLE_API_KEY (used by embeddings & legacy callers)
+GOOGLE_API_KEY = (
+    _clean_env(os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY"))
+    or (GOOGLE_API_KEYS[0] if GOOGLE_API_KEYS else "")
+)
+
+GOOGLE_MODEL = _clean_env(
+    os.environ.get("GOOGLE_MODEL")
+    or os.environ.get("GEMINI_MODEL")
+    or "gemini-3.5-flash-lite"
+)
+GOOGLE_SUMMARY_MODEL = _clean_env(
+    os.environ.get("GOOGLE_SUMMARY_MODEL")
+    or os.environ.get("GEMINI_SUMMARY_MODEL")
+    or GOOGLE_MODEL
+)
+GOOGLE_MAX_RETRIES = _int_env("GOOGLE_MAX_RETRIES", "3")
+
 TAVILY_API_KEY = _clean_env(os.environ.get("TAVILY_API_KEY"))
 
 # Load configured Supadata Keys dynamically
@@ -48,7 +96,7 @@ SUPADATA_KEYS = [
     )
 ]
 
-# --- Ollama Configuration (For Video Summaries & Chat with Fallback Keys) ---
+# --- Ollama Configuration (Legacy Fallback) ---
 OLLAMA_API_KEYS = [
     cleaned
     for key in [
@@ -69,16 +117,6 @@ OLLAMA_API_KEYS = list(dict.fromkeys(OLLAMA_API_KEYS))
 OLLAMA_HOST = _clean_env(os.environ.get("OLLAMA_HOST", "https://ollama.com"))
 OLLAMA_SUMMARY_MODEL = _clean_env(os.environ.get("OLLAMA_SUMMARY_MODEL", "gemma4:31b-cloud"))
 OLLAMA_MODEL = _clean_env(os.environ.get("OLLAMA_MODEL")) or OLLAMA_SUMMARY_MODEL
-
-
-def _int_env(name: str, default: str) -> int:
-    """Parse an integer env var at import time without crashing on malformed values."""
-    try:
-        return int(_clean_env(os.environ.get(name, default)) or default)
-    except (TypeError, ValueError):
-        return int(default)
-
-
 OLLAMA_NUM_CTX = _int_env("OLLAMA_NUM_CTX", "131072")
 
 
